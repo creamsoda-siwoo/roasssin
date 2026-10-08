@@ -108,10 +108,17 @@
   .levels { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); }
   .hint { transition: opacity .6s; }
   .hint.faded { opacity: 0; }
+  .goal { transition: opacity .6s; }
+  .goal.faded { opacity: 0; }
   .touch-only { display: none; }
   body.touch .touch-only { display: revert; }
   body.touch .mouse-only { display: none; }
   body.touch .hud kbd { display: none; }
+  body.big .stick { width: 168px; height: 168px; }
+  body.big .stick .knob { width: 68px; height: 68px; margin: -34px 0 0 -34px; }
+  body.big .tb { width: 76px; height: 76px; font-size: 16px; }
+  body.big .tb.big { width: 104px; height: 104px; font-size: 22px; }
+  #bBig[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
   body.touch .hint { display: none !important; }
 
   #touch { position: fixed; inset: 0; pointer-events: none; }
@@ -176,7 +183,7 @@
     <div class="stat"><span>시간</span><b id="hTime">0.0</b></div>
     <div class="stat"><span>사망</span><b id="hDeaths">0</b></div>
     <button id="bRestart" type="button"><kbd>R</kbd> 재시작</button>
-    <button id="bMenu" type="button"><kbd>Esc</kbd> 메뉴</button>
+    <button id="bPause" type="button" aria-label="일시정지"><kbd>Esc</kbd> 일시정지</button>
   </div>
   <div class="hint" id="hHint"></div>
 </div>
@@ -202,7 +209,7 @@
       <div class="seal" aria-hidden="true">刺<br>客</div>
     </div>
     <p class="lead">밤의 성채에 숨어든 자객. 쇠갈고리 하나로 들보와 벽을 타고, 막마다 다른 장치를 풀어 출구까지 가라.</p>
-    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">하드 모드 끔</button><button id="bSound" type="button">소리 켬</button><button class="touch-only" id="bFull" type="button">전체 화면으로</button></div>
+    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">하드 모드 끔</button><button id="bSound" type="button">소리 켬</button><button class="touch-only" id="bBig" type="button" aria-pressed="false">큰 버튼 끔</button><button class="touch-only" id="bFull" type="button">전체 화면으로</button></div>
     <p class="hardnote" id="hardNote" hidden>하드 모드: 경비 시야가 넓고 순식간에 알아챈다 · 순찰이 빠르다 · 파수꾼이 더 자주 돌아본다 · 금 간 들보가 더 빨리 무너지고 늦게 되살아난다. 기록은 따로 남는다.</p>
     <div class="levels" id="levelList"></div>
     <details class="fold sr">
@@ -227,6 +234,18 @@
       <dt><kbd>R</kbd> <kbd>M</kbd></dt><dd>재시작 · 소리 켜기/끄기</dd>
     </dl>
     </details>
+  </div>
+</div>
+
+<div class="overlay" id="pauseBox" hidden>
+  <div class="panel win">
+    <div class="act" id="pAct"></div>
+    <h2>일시정지</h2>
+    <div class="row">
+      <button class="primary" id="bResume" type="button"><kbd>Esc</kbd> 계속하기</button>
+      <button id="bPauseRestart" type="button">재시작</button>
+      <button id="bMenu" type="button">메뉴</button>
+    </div>
   </div>
 </div>
 
@@ -2605,7 +2624,7 @@ const SAVE_KEY = "rope-assassin-v1";
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, big: !!s.big };
   } catch (e) {}
   return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, hard: false };
 }
@@ -2631,7 +2650,7 @@ let dpr = 1, scale = 1, viewW = VW, viewH = VH;
 let touchMode = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches);
 let touchAim = null;
 function resize() {
-  dpr = Math.min(2, window.devicePixelRatio || 1);
+  dpr = Math.min(touchMode ? 1.75 : 2, window.devicePixelRatio || 1);
   const w = window.innerWidth, h = window.innerHeight;
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
   // Phones get a closer camera; in portrait the base is square so the world is not shrunk to a sliver.
@@ -2696,7 +2715,10 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "Space") jumpQueued = true;
     if (e.code === "KeyR") restartLevel();
     if (e.code === "KeyQ") releaseHook();
-    if (e.code === "Escape") showMenu();
+    if (e.code === "Escape" || e.code === "KeyP") pauseGame();
+  } else if (mode === "pause") {
+    if (e.code === "Escape" || e.code === "KeyP" || e.code === "Enter") resumeGame();
+    if (e.code === "KeyR") { resumeGame(); restartLevel(); }
   } else if (mode === "win" && !(run && !run.done)) {
     if (e.code === "Enter" || e.code === "Space") winNext();
     if (e.code === "KeyR") winRetry();
@@ -2707,7 +2729,8 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) return;
+  if (!document.hidden) { if (mode === "play" || mode === "pause") keepAwake(true); return; }
+  if (mode === "play") pauseGame();
   for (const k in keys) keys[k] = false;
   stickEnd(); touchAim = null;
   document.querySelectorAll(".tb.on").forEach((b) => b.classList.remove("on"));
@@ -3270,6 +3293,7 @@ function die(reason) {
   burst(p.x + p.w / 2, p.y + p.h / 2, 10, "#c8423b", 200);
   L.hook.state = "idle";
   sfx.die();
+  if (touchMode && navigator.vibrate) { try { navigator.vibrate([30, 40, 30]); } catch (e) {} }
   toast(reason, true);
 }
 
@@ -3376,7 +3400,9 @@ function startLevel(i, keepStats) {
   if (!keepStats) { runTime = 0; runDeaths = 0; showCard(); }
   mode = "play";
   jumpQueued = false;
-  $("menu").hidden = true; $("winBox").hidden = true; $("hud").hidden = false;
+  $("menu").hidden = true; $("winBox").hidden = true; $("pauseBox").hidden = true; $("hud").hidden = false;
+  keepAwake(true);
+  fadeGoal();
   $("hAct").textContent = ACTS[i] + " / " + LEVELS.length + (hard ? " · 하드" : "");
   $("hName").textContent = LEVELS[i].name;
   $("hGoal").textContent = LEVELS[i].goal;
@@ -3387,6 +3413,32 @@ function startLevel(i, keepStats) {
   $("sRun").hidden = !run;
   syncTouchUI();
   if (!keepStats) showHint();
+}
+// Pause: the clock (and the speedrun clock) only runs in play/dead, so nothing ticks here.
+function pauseGame() {
+  if (mode !== "play") return;
+  mode = "pause";
+  for (const k in keys) keys[k] = false;
+  stickEnd(); touchAim = null;
+  $("pAct").textContent = ACTS[cur] + " · " + LEVELS[cur].name + (run ? ` · 스피드런 ${run.t.toFixed(1)}초` : "");
+  $("pauseBox").hidden = false;
+  syncTouchUI();
+  setTimeout(() => $("bResume").focus(), 30);
+}
+function resumeGame() {
+  if (mode !== "pause") return;
+  mode = "play";
+  $("pauseBox").hidden = true;
+  syncTouchUI();
+}
+// Keep the phone screen on while playing.
+let wakeLock = null;
+function keepAwake(on) {
+  try {
+    if (on && !wakeLock && navigator.wakeLock && document.visibilityState === "visible") {
+      navigator.wakeLock.request("screen").then((l) => { wakeLock = l; l.addEventListener("release", () => { wakeLock = null; }); }).catch(() => {});
+    } else if (!on && wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  } catch (e) {}
 }
 function restartLevel() { if (L) startLevel(cur, true); }
 function nextLevel() { if (cur + 1 < LEVELS.length) startLevel(cur + 1, false); else showMenu(); }
@@ -3450,6 +3502,8 @@ function win() {
 function showMenu() {
   mode = "menu";
   run = null;
+  $("pauseBox").hidden = true;
+  keepAwake(false);
   $("menu").hidden = false; $("winBox").hidden = true; $("hud").hidden = true;
   syncTouchUI();
   renderLevelList();
@@ -3494,20 +3548,35 @@ function renderLevelList() {
 $("bRestart").addEventListener("click", () => { restartLevel(); cv.focus(); });
 $("bCont").addEventListener("click", () => { ensureAudio(); startLevel(Math.min(LEVELS.length, save.unlocked) - 1, false); });
 $("bSound").addEventListener("click", () => { ensureAudio(); toggleMute(); });
+function applyBig() {
+  document.body.classList.toggle("big", !!save.big);
+  $("bBig").textContent = save.big ? "큰 버튼 켬" : "큰 버튼 끔";
+  $("bBig").setAttribute("aria-pressed", String(!!save.big));
+}
+applyBig();
+$("bBig").addEventListener("click", () => { save.big = !save.big; writeSave(); applyBig(); });
 $("bHard").addEventListener("click", () => {
   hard = !hard; save.hard = hard; writeSave();
   applyDifficulty(); renderLevelList();
 });
 $("bMenu").addEventListener("click", showMenu);
+$("bPause").addEventListener("click", pauseGame);
+$("bResume").addEventListener("click", resumeGame);
+$("bPauseRestart").addEventListener("click", () => { resumeGame(); restartLevel(); });
 $("bNext").addEventListener("click", winNext);
 $("bRetry").addEventListener("click", winRetry);
 $("bWinMenu").addEventListener("click", showMenu);
 document.body.classList.toggle("touch", touchMode);
-$("hName").addEventListener("click", showHint);
+$("hName").addEventListener("click", () => { showHint(); fadeGoal(); });
 function syncHintText() {
   if (!L) return;
   const lv = LEVELS[cur];
   $("hHint").innerHTML = touchMode && lv.touchHint ? lv.touchHint : lv.hint;
+}
+let goalTimer = 0;
+function fadeGoal() {
+  const g = $("hGoal"); g.classList.remove("faded"); clearTimeout(goalTimer);
+  if (touchMode) goalTimer = setTimeout(() => g.classList.add("faded"), 4000);
 }
 let hintTimer = 0;
 function showHint() {
@@ -3575,7 +3644,7 @@ function makeSky(i, W) {
 }
 
 function prerender(st) {
-  const R = 2;
+  const R = touchMode ? 1.5 : 2;
   const c = document.createElement("canvas");
   c.width = st.W * TS * R; c.height = st.H * TS * R;
   const g = c.getContext("2d");
@@ -3943,7 +4012,7 @@ function step(dt) {
   } else if (mode === "dead") {
     deadT += dt;
     updateCrates(dt);
-    if (deadT > 1.0) restartLevel();
+    if (deadT > 0.65) restartLevel();
   }
   if (L) updateParticles(dt);
 }
