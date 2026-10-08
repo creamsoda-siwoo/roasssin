@@ -20,19 +20,19 @@
     --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
     color-scheme: dark;
   }
-  html, body { height: 100%; margin: 0; background: var(--night); color: var(--paper); font-family: var(--body); overflow: hidden; }
+  html, body { height: 100%; height: 100dvh; margin: 0; overscroll-behavior: none; background: var(--night); color: var(--paper); font-family: var(--body); overflow: hidden; }
   #stage { position: fixed; inset: 0; }
   #cv { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
 
   .hud { position: fixed; inset: 0; pointer-events: none; font-size: 14px; }
-  .hud-l { position: absolute; left: 20px; top: calc(16px + env(safe-area-inset-top, 0px)); display: grid; gap: 4px; max-width: min(460px, 60vw); }
+  .hud-l { position: absolute; left: calc(20px + env(safe-area-inset-left, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); display: grid; gap: 4px; max-width: min(460px, 60vw); }
   .act { font-size: 12px; letter-spacing: 0.14em; color: var(--rope); font-weight: 600; }
   .lname { font-family: var(--display); font-size: 28px; line-height: 1.1; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
   .goal { color: var(--paper); opacity: .9; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .chip { font-size: 12px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); font-variant-numeric: tabular-nums; }
   .chip.done { border-color: var(--rope); color: var(--rope); }
-  .hud-r { position: absolute; right: 20px; top: calc(16px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; align-items: center; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end; }
+  .hud-r { position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); top: calc(16px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; align-items: center; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end; }
   .stat { display: grid; justify-items: end; padding: 0 8px; }
   .stat span { font-size: 11px; letter-spacing: .12em; color: var(--paper-dim); }
   .stat b { font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -53,8 +53,8 @@
   #card .act { font-size: 14px; }
   #card .t { font-family: var(--display); font-size: clamp(40px, 8vw, 84px); line-height: 1; text-shadow: 0 4px 0 rgba(0,0,0,.6); }
 
-  .overlay { position: fixed; inset: 0; display: grid; align-items: center; overflow-y: auto; padding-inline: 16px; padding-block: 24px; background: linear-gradient(90deg, rgba(8,9,20,.92) 0%, rgba(8,9,20,.72) 55%, rgba(8,9,20,.25) 100%); }
-  .panel { width: min(760px, 100%); margin-left: clamp(0px, 7vw, 120px); display: grid; gap: 22px; }
+  .overlay { position: fixed; inset: 0; display: grid; align-items: center; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: calc(24px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px)); background: linear-gradient(90deg, rgba(8,9,20,.92) 0%, rgba(8,9,20,.72) 55%, rgba(8,9,20,.25) 100%); }
+  .panel { --indent: clamp(0px, 7vw, 120px); width: min(760px, 100% - var(--indent)); margin-left: var(--indent); min-width: 0; display: grid; gap: 22px; }
   .brand { display: flex; align-items: flex-end; gap: 16px; }
   .brand h1 { font-family: var(--display); font-weight: 400; font-size: clamp(48px, 10vw, 96px); line-height: .95; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
   .seal { flex: none; width: 54px; height: 54px; border: 3px solid var(--vermilion); color: var(--vermilion); display: grid; place-items: center; font-family: var(--display); font-size: 20px; line-height: 1; transform: rotate(-6deg); border-radius: 4px; margin-bottom: 8px; }
@@ -78,8 +78,9 @@
   .row { display: flex; gap: 10px; flex-wrap: wrap; }
   .primary { border-color: var(--rope); color: var(--rope); }
   [hidden] { display: none !important; }
-  body.touch .hud-r { top: calc(10px + env(safe-area-inset-top, 0px)); bottom: auto; right: 12px; }
-  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  body.touch .hud-r { top: calc(10px + env(safe-area-inset-top, 0px)); bottom: auto; right: calc(12px + env(safe-area-inset-right, 0px)); }
+  body.touch button kbd { display: none; }
+  body { word-break: keep-all; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   button { touch-action: manipulation; }
   .overlay { touch-action: pan-y; }
   .levels { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
@@ -107,9 +108,23 @@
   body.touch .act { font-size: 11px; }
   body.touch .stat b { font-size: 15px; }
   body.touch .hud-r button { padding: 6px 10px; font-size: 13px; }
-  body.touch .hint { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); max-width: min(520px, calc(100vw - 360px)); min-width: 200px; font-size: 12px; }
+  body.touch .hint { left: calc(172px + env(safe-area-inset-left, 0px)); right: calc(202px + env(safe-area-inset-right, 0px)); transform: none; width: auto; max-width: none; margin-inline: auto; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); font-size: 12px; }
+  body.touch .hud-l { max-width: calc(100vw - 340px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)); min-width: 150px; }
+  @media (orientation: portrait) {
+    body.touch .hint { left: calc(16px + env(safe-area-inset-left, 0px)); right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(176px + env(safe-area-inset-bottom, 0px)); }
+    body.touch .hud-l { max-width: calc(100vw - 32px); top: calc(64px + env(safe-area-inset-top, 0px)); }
+    body.touch #rotate { top: 38%; max-width: calc(100vw - 48px); }
+  }
+  @media (max-height: 360px) {
+    body.touch .stick { width: 116px; height: 116px; }
+    body.touch .tb { width: 56px; height: 56px; }
+    body.touch .tb.big { width: 76px; height: 76px; }
+    body.touch .hint { left: calc(148px + env(safe-area-inset-left, 0px)); right: calc(176px + env(safe-area-inset-right, 0px)); }
+    body.touch .goal { display: none; }
+  }
   @media (max-width: 640px) {
-    .hud-l { left: 16px; max-width: calc(100vw - 32px); }
+    .panel { --indent: 0px; }
+    .hud-l { left: calc(16px + env(safe-area-inset-left, 0px)); max-width: calc(100vw - 32px); }
     .hud-r { right: 16px; top: auto; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
     .lname { font-size: 22px; }
   }
@@ -128,6 +143,7 @@
   <div class="hud-r">
     <div class="stat"><span>시간</span><b id="hTime">0.0</b></div>
     <div class="stat"><span>사망</span><b id="hDeaths">0</b></div>
+    <button id="bMute" type="button" aria-label="소리 켜기/끄기"><kbd>M</kbd> <span id="muteLbl">소리</span></button>
     <button id="bRestart" type="button"><kbd>R</kbd> 재시작</button>
     <button id="bMenu" type="button"><kbd>Esc</kbd> 메뉴</button>
   </div>
@@ -211,6 +227,7 @@ const LEVELS = [
     name: "첫 번째 줄",
     goal: "가시밭을 건너 빛나는 출구 문까지 가라",
     hint: "조준 후 <kbd>클릭</kbd>으로 후크를 걸고, <kbd>W</kbd>로 감아 몸을 띄운 뒤 <kbd>A</kbd><kbd>D</kbd>로 흔들어라. 높이 올랐을 때 <kbd>Space</kbd>로 줄을 놓는다.",
+    touchHint: "들보 쪽을 눌러 조준하고 떼면 후크가 걸린다. 스틱을 위로 밀어 줄을 감고 좌우로 흔든 뒤, 높이 올랐을 때 점프로 줄을 놓는다.",
     map: [
       "##########################################",
       "#                                        #",
@@ -275,6 +292,7 @@ const LEVELS = [
     name: "무거운 짐",
     goal: "발판 두 개를 모두 눌러 셔터를 열어라",
     hint: "후크로 상자를 맞히면 내 쪽으로 끌려온다. 상자를 밀어 발판 위에 올려 두어라. 막혔으면 <kbd>R</kbd>.",
+    touchHint: "후크로 상자를 맞히면 내 쪽으로 끌려온다. 상자를 밀어 발판 위에 올려 두어라. 막혔으면 재시작.",
     map: [
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
       "X                                      X",
@@ -511,11 +529,15 @@ function resize() {
   dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = window.innerWidth, h = window.innerHeight;
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-  const bw = touchMode ? 620 : VW, bh = touchMode ? 349 : VH;
+  // Phones get a closer camera; in portrait the base is square so the world is not shrunk to a sliver.
+  const portrait = h > w;
+  const bw = touchMode ? (portrait ? 440 : 620) : VW, bh = touchMode ? (portrait ? 440 : 349) : VH;
   scale = Math.min(w / bw, h / bh);
   viewW = w / scale; viewH = h / scale;
 }
 window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => setTimeout(resize, 150));
+if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
 resize();
 
 // ---------- audio ----------
@@ -572,15 +594,27 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "KeyR") startLevel(cur, false);
     if (e.code === "Escape") showMenu();
   }
-  if (e.code === "KeyM") { muted = !muted; toast(muted ? "소리 끔" : "소리 켬"); }
+  if (e.code === "KeyM") toggleMute();
 });
 window.addEventListener("keyup", (e) => { keys[e.code] = false; });
 window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) return;
+  for (const k in keys) keys[k] = false;
+  stickEnd(); touchAim = null;
+  document.querySelectorAll(".tb.on").forEach((b) => b.classList.remove("on"));
+});
+function toggleMute() {
+  muted = !muted;
+  $("muteLbl").textContent = muted ? "소리 끔" : "소리";
+  toast(muted ? "소리 끔" : "소리 켬");
+}
 function setTouchMode(on) {
   if (touchMode === on && document.body.classList.contains("touch") === on) return;
   touchMode = on;
   document.body.classList.toggle("touch", on);
   syncTouchUI();
+  syncHintText();
   resize();
 }
 function syncTouchUI() {
@@ -1149,7 +1183,7 @@ function startLevel(i, keepStats) {
   $("hAct").textContent = ACTS[i] + " / " + LEVELS.length;
   $("hName").textContent = LEVELS[i].name;
   $("hGoal").textContent = LEVELS[i].goal;
-  $("hHint").innerHTML = LEVELS[i].hint;
+  syncHintText();
   snapCamera();
   hudCache = "";
   touchAim = null;
@@ -1199,12 +1233,18 @@ function renderLevelList() {
   });
 }
 $("bRestart").addEventListener("click", () => { restartLevel(); cv.focus(); });
+$("bMute").addEventListener("click", () => { ensureAudio(); toggleMute(); });
 $("bMenu").addEventListener("click", showMenu);
 $("bNext").addEventListener("click", nextLevel);
 $("bRetry").addEventListener("click", () => startLevel(cur, false));
 $("bWinMenu").addEventListener("click", showMenu);
 document.body.classList.toggle("touch", touchMode);
 $("hName").addEventListener("click", showHint);
+function syncHintText() {
+  if (!L) return;
+  const lv = LEVELS[cur];
+  $("hHint").innerHTML = touchMode && lv.touchHint ? lv.touchHint : lv.hint;
+}
 let hintTimer = 0;
 function showHint() {
   const el = $("hHint"); el.classList.remove("faded");
