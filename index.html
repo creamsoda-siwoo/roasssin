@@ -135,6 +135,9 @@
   .stick:not(.float) { transition: left .12s, top .12s; }
   .tcol { display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .tb.big.hook { border-color: var(--teal); color: var(--teal); }
+  body.touch .tb.big#tJump { width: 92px; height: 92px; font-size: 21px; }
+  body.touch.big .tb.big#tJump { width: 112px; height: 112px; font-size: 24px; }
+  @media (max-height: 360px) { body.touch:not(.big) .tb.big#tJump { width: 80px; height: 80px; font-size: 19px; } }
   .stick { position: absolute; left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: 104px; height: 104px; border-radius: 50%; border: 2px solid var(--line); background: rgba(14, 16, 32, .45); pointer-events: auto; touch-action: none; }
   .stick .knob { position: absolute; left: 50%; top: 50%; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; background: rgba(236, 228, 207, .2); border: 2px solid rgba(236, 228, 207, .5); }
   .tbtns { position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 14px; align-items: flex-end; pointer-events: auto; }
