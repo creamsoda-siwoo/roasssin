@@ -218,7 +218,7 @@
     </div>
     <p class="lead">밤의 성채에 숨어든 자객. 쇠갈고리 하나로 들보와 벽을 타고, 막마다 다른 장치를 풀어 출구까지 가라.</p>
     <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">하드 모드 끔</button><button id="bSound" type="button">소리 켬</button><button class="touch-only" id="bBig" type="button" aria-pressed="false">큰 버튼 끔</button><button class="touch-only" id="bFull" type="button">전체 화면으로</button><button id="bInstall" type="button" hidden>앱 설치</button></div>
-    <p class="hardnote installnote" id="installNote" hidden>아이폰: 공유 버튼 → "홈 화면에 추가"를 누르면 앱처럼 설치된다.</p>
+    <p class="hardnote installnote" id="installNote" hidden></p>
     <p class="hardnote" id="hardNote" hidden>하드 모드: 경비 시야가 넓고 순식간에 알아챈다 · 순찰이 빠르다 · 파수꾼이 더 자주 돌아본다 · 금 간 들보가 더 빨리 무너지고 늦게 되살아난다. 기록은 따로 남는다.</p>
     <div class="levels" id="levelList"></div>
     <details class="fold sr">
@@ -3048,11 +3048,22 @@ let installEvt = null;
 const standalone = () => (window.matchMedia && matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches) || navigator.standalone === true;
 const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("bInstall").hidden = false; });
-window.addEventListener("appinstalled", () => { installEvt = null; $("bInstall").hidden = true; toast("앱이 설치되었습니다"); });
-if (!standalone() && isIOS) $("bInstall").hidden = false;
+window.addEventListener("appinstalled", () => { installEvt = null; $("bInstall").hidden = true; $("installNote").hidden = true; toast("앱이 설치되었습니다"); });
+const ua = navigator.userAgent;
+const inApp = /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp|; wv\)/i.test(ua);
+const isSamsung = /SamsungBrowser/i.test(ua);
+// Always offer the button outside the installed app; when the browser gives no prompt, explain the manual steps.
+if (!standalone()) $("bInstall").hidden = false;
+function installHelp() {
+  if (location.protocol === "file:") return "파일로 직접 연 상태에서는 설치할 수 없다. https://creamsoda-siwoo.github.io/roasssin/ 주소로 열어라.";
+  if (inApp) return "카카오톡·네이버 같은 앱 안의 브라우저에서는 설치가 안 된다. 오른쪽 위 메뉴에서 '다른 브라우저로 열기'를 눌러 " + (isIOS ? "사파리" : "크롬") + "에서 연 뒤 다시 눌러라.";
+  if (isIOS) return /CriOS|FxiOS|EdgiOS/.test(ua) ? "아이폰은 사파리에서만 설치할 수 있다. 사파리로 이 주소를 연 뒤, 아래쪽 공유 버튼 → '홈 화면에 추가'를 눌러라." : "아래쪽(또는 위쪽) 공유 버튼 □↑ → '홈 화면에 추가' → '추가'를 눌러라.";
+  if (isSamsung) return "아래쪽 메뉴 ≡ → '현재 페이지 추가' → '홈 화면'을 눌러라.";
+  return "크롬 오른쪽 위 ⋮ 메뉴 → '앱 설치' 또는 '홈 화면에 추가'를 눌러라. 메뉴에 없으면 페이지를 한 번 새로고침한 뒤 다시 시도해라.";
+}
 $("bInstall").addEventListener("click", () => {
-  if (installEvt) { installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; $("bInstall").hidden = true; }); }
-  else $("installNote").hidden = !$("installNote").hidden;
+  if (installEvt) { installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; }); return; }
+  const n = $("installNote"); n.textContent = installHelp(); n.hidden = !n.hidden;
 });
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
