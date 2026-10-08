@@ -73,6 +73,16 @@
   .lv .nm b { font-weight: 600; }
   .lv .nm small { color: var(--paper-dim); font-size: 12px; }
   .lv .best { font-size: 12px; color: var(--paper-dim); font-variant-numeric: tabular-nums; }
+  .sr { display: grid; gap: 8px; }
+  .sr h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--rope); }
+  .sr p { margin: 0; font-size: 12px; color: var(--paper-dim); }
+  .srgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
+  .srb { display: grid; gap: 2px; text-align: left; padding: 8px 12px; }
+  .srb b { font-weight: 600; font-size: 14px; }
+  .srb small { font-size: 11px; color: var(--paper-dim); font-variant-numeric: tabular-nums; }
+  .srb.all { grid-column: 1 / -1; border-color: var(--rope); }
+  .srb.all b { color: var(--rope); }
+  .stat.run b { color: var(--rope); }
   .controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; color: var(--paper-dim); align-items: center; }
   .controls dt { justify-self: start; }
   .controls dd { margin: 0; }
@@ -153,6 +163,7 @@
     <div class="chips" id="hChips"></div>
   </div>
   <div class="hud-r">
+    <div class="stat run" id="sRun" hidden><span>스피드런</span><b id="hRun">0.0</b></div>
     <div class="stat"><span>시간</span><b id="hTime">0.0</b></div>
     <div class="stat"><span>사망</span><b id="hDeaths">0</b></div>
     <button id="bMute" type="button" aria-label="소리 켜기/끄기"><kbd>M</kbd> <span id="muteLbl">소리</span></button>
@@ -180,6 +191,11 @@
     </div>
     <p class="lead">밤의 성채에 숨어든 자객. 쇠갈고리 하나로 들보와 벽을 타고, 막마다 다른 장치를 풀어 출구까지 가라.</p>
     <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button class="touch-only" id="bFull" type="button">전체 화면으로</button></div>
+    <section class="sr" aria-labelledby="srTitle">
+      <h2 id="srTitle">스피드런</h2>
+      <p>구간의 막을 쉬지 않고 이어서 깬다. 시간은 막 사이에 멈추고, 죽거나 재시작해도 계속 흐른다. 구간의 막을 모두 열어야 도전할 수 있다.</p>
+      <div class="srgrid" id="srList"></div>
+    </section>
     <div class="levels" id="levelList"></div>
     <dl class="controls touch-only">
       <dt><kbd>화면 누르기</kbd></dt><dd>누른 채로 조준하고, 떼면 후크 발사 · 가까운 들보에 자동으로 맞춰 준다</dd>
@@ -2571,9 +2587,9 @@ const SAVE_KEY = "rope-assassin-v1";
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {} };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {} };
   } catch (e) {}
-  return { unlocked: 1, best: {} };
+  return { unlocked: 1, best: {}, sr: {} };
 }
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 const save = loadSave();
@@ -2651,9 +2667,9 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "KeyR") restartLevel();
     if (e.code === "KeyQ") releaseHook();
     if (e.code === "Escape") showMenu();
-  } else if (mode === "win") {
-    if (e.code === "Enter" || e.code === "Space") nextLevel();
-    if (e.code === "KeyR") startLevel(cur, false);
+  } else if (mode === "win" && !(run && !run.done)) {
+    if (e.code === "Enter" || e.code === "Space") winNext();
+    if (e.code === "KeyR") winRetry();
     if (e.code === "Escape") showMenu();
   }
   if (e.code === "KeyM") toggleMute();
@@ -3170,7 +3186,7 @@ function detected(g) {
 }
 function die(reason) {
   if (mode !== "play") return;
-  mode = "dead"; deadT = 0; runDeaths++;
+  mode = "dead"; deadT = 0; runDeaths++; if (run) run.deaths++;
   const p = L.player;
   burst(p.x + p.w / 2, p.y + p.h / 2, 26, "#0d0d12", 260);
   burst(p.x + p.w / 2, p.y + p.h / 2, 10, "#c8423b", 200);
@@ -3290,11 +3306,46 @@ function startLevel(i, keepStats) {
   snapCamera();
   hudCache = null;
   touchAim = null;
+  $("sRun").hidden = !run;
   syncTouchUI();
   if (!keepStats) showHint();
 }
 function restartLevel() { if (L) startLevel(cur, true); }
 function nextLevel() { if (cur + 1 < LEVELS.length) startLevel(cur + 1, false); else showMenu(); }
+// Speedrun: a range of stages played back to back on one in-game clock.
+let run = null;
+const SEGMENTS = [[0, LEVELS.length - 1]];
+for (let a = 0; a < LEVELS.length; a += 10) SEGMENTS.push([a, Math.min(LEVELS.length, a + 10) - 1]);
+const segKey = (a, b) => a + "-" + b;
+function startRun(a, b) {
+  run = { a, b, t: 0, deaths: 0, done: false };
+  startLevel(a, false);
+}
+function winNext() { if (run) { run = null; showMenu(); } else nextLevel(); }
+function winRetry() { if (run) startRun(run.a, run.b); else startLevel(cur, false); }
+function runStageCleared() {
+  if (cur < run.b) {
+    toast(`${ACTS[cur]} 통과 · ${run.t.toFixed(1)}초`);
+    const from = cur;
+    setTimeout(() => { if (run && mode === "win" && cur === from) startLevel(from + 1, false); }, 650);
+    return;
+  }
+  run.done = true;
+  const k = segKey(run.a, run.b), prev = save.sr[k];
+  const better = !prev || run.t < prev.time;
+  if (better) { save.sr[k] = { time: run.t, deaths: run.deaths }; writeSave(); }
+  $("wAct").textContent = `스피드런 · ${ACTS[run.a]} – ${ACTS[run.b]}`;
+  $("wTitle").textContent = better && prev ? "신기록" : "스피드런 완료";
+  $("wTime").textContent = run.t.toFixed(1) + "초";
+  $("wDeaths").textContent = run.deaths;
+  $("wBest").textContent = (better ? run.t : prev.time).toFixed(1) + "초" + (better && prev ? " ★" : "");
+  $("bNext").innerHTML = "<kbd>Enter</kbd> 메뉴로";
+  $("bRetry").textContent = "다시 도전";
+  $("bWinMenu").hidden = true;
+  $("winBox").hidden = false; $("hud").hidden = true;
+  syncTouchUI();
+  setTimeout(() => $("bNext").focus(), 30);
+}
 function win() {
   mode = "win";
   sfx.win();
@@ -3304,6 +3355,9 @@ function win() {
   if (better) save.best[cur] = rec;
   save.unlocked = Math.max(save.unlocked, Math.min(LEVELS.length, cur + 2));
   writeSave();
+  if (run) { runStageCleared(); return; }
+  $("bRetry").textContent = "다시 하기";
+  $("bWinMenu").hidden = false;
   $("wAct").textContent = ACTS[cur] + " · " + LEVELS[cur].name;
   const last = cur + 1 >= LEVELS.length;
   $("wTitle").textContent = last ? "성채 탈출" : "임무 완료";
@@ -3317,6 +3371,7 @@ function win() {
 }
 function showMenu() {
   mode = "menu";
+  run = null;
   $("menu").hidden = false; $("winBox").hidden = true; $("hud").hidden = true;
   syncTouchUI();
   renderLevelList();
@@ -3336,13 +3391,26 @@ function renderLevelList() {
     b.addEventListener("click", () => { ensureAudio(); startLevel(i, false); });
     box.appendChild(b);
   });
+  const sr = $("srList");
+  sr.innerHTML = "";
+  SEGMENTS.forEach(([a, b2], idx) => {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "srb" + (idx === 0 ? " all" : ""); btn.id = "sr" + idx;
+    const locked = b2 >= save.unlocked;
+    btn.disabled = locked;
+    const best = save.sr[segKey(a, b2)];
+    const label = idx === 0 ? `전 구간 · ${a + 1}–${b2 + 1}막` : `${a + 1}–${b2 + 1}막`;
+    btn.innerHTML = `<b>${label}</b><small>${locked ? "잠김" : best ? "최고 " + best.time.toFixed(1) + "초" : "기록 없음"}</small>`;
+    btn.addEventListener("click", () => { ensureAudio(); startRun(a, b2); });
+    sr.appendChild(btn);
+  });
 }
 $("bRestart").addEventListener("click", () => { restartLevel(); cv.focus(); });
 $("bCont").addEventListener("click", () => { ensureAudio(); startLevel(Math.min(LEVELS.length, save.unlocked) - 1, false); });
 $("bMute").addEventListener("click", () => { ensureAudio(); toggleMute(); });
 $("bMenu").addEventListener("click", showMenu);
-$("bNext").addEventListener("click", nextLevel);
-$("bRetry").addEventListener("click", () => startLevel(cur, false));
+$("bNext").addEventListener("click", winNext);
+$("bRetry").addEventListener("click", winRetry);
 $("bWinMenu").addEventListener("click", showMenu);
 document.body.classList.toggle("touch", touchMode);
 $("hName").addEventListener("click", showHint);
@@ -3378,6 +3446,7 @@ let hudCache = "";
 function updateHUD() {
   if (!L) return;
   $("hTime").textContent = runTime.toFixed(1);
+  if (run) $("hRun").textContent = run.t.toFixed(1);
   $("hDeaths").textContent = runDeaths;
   const chips = [];
   if (L.needKey) {
@@ -3771,6 +3840,7 @@ function render(t) {
 
 // ---------- loop ----------
 function step(dt) {
+  if (run && !run.done && (mode === "play" || mode === "dead")) run.t += dt;
   if (mode === "play") {
     runTime += dt;
     updatePlayer(dt);
