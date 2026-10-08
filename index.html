@@ -114,10 +114,10 @@
   body.touch .touch-only { display: revert; }
   body.touch .mouse-only { display: none; }
   body.touch .hud kbd { display: none; }
-  body.big .stick { width: 168px; height: 168px; }
-  body.big .stick .knob { width: 68px; height: 68px; margin: -34px 0 0 -34px; }
-  body.big .tb { width: 76px; height: 76px; font-size: 16px; }
-  body.big .tb.big { width: 104px; height: 104px; font-size: 22px; }
+  body.touch.big .stick { width: 136px; height: 136px; }
+  body.touch.big .stick .knob { width: 56px; height: 56px; margin: -28px 0 0 -28px; }
+  body.touch.big .tb { width: 64px; height: 64px; font-size: 14px; }
+  body.touch.big .tb.big { width: 88px; height: 88px; font-size: 20px; }
   #bBig[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
   body.touch .hint { display: none !important; }
 
@@ -125,13 +125,13 @@
   .stickzone { position: absolute; left: 0; bottom: 0; width: 42%; height: 62%; pointer-events: auto; touch-action: none; }
   .stick.float { transition: none; }
   .stick:not(.float) { transition: left .12s, top .12s; }
-  .tcol { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  .tcol { display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .tb.big.hook { border-color: var(--teal); color: var(--teal); }
-  .stick { position: absolute; left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: 136px; height: 136px; border-radius: 50%; border: 2px solid var(--line); background: rgba(14, 16, 32, .45); pointer-events: auto; touch-action: none; }
-  .stick .knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(236, 228, 207, .2); border: 2px solid rgba(236, 228, 207, .5); }
+  .stick { position: absolute; left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: 104px; height: 104px; border-radius: 50%; border: 2px solid var(--line); background: rgba(14, 16, 32, .45); pointer-events: auto; touch-action: none; }
+  .stick .knob { position: absolute; left: 50%; top: 50%; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; background: rgba(236, 228, 207, .2); border: 2px solid rgba(236, 228, 207, .5); }
   .tbtns { position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 14px; align-items: flex-end; pointer-events: auto; }
-  .tb { width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 14px; touch-action: none; background: rgba(14, 16, 32, .55); }
-  .tb.big { width: 88px; height: 88px; font-family: var(--display); font-size: 20px; border-color: var(--rope); color: var(--rope); }
+  .tb { width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 13px; touch-action: none; background: rgba(14, 16, 32, .55); }
+  .tb.big { width: 70px; height: 70px; font-family: var(--display); font-size: 17px; border-color: var(--rope); color: var(--rope); }
   .tb.on { background: rgba(220, 165, 74, .35); }
   body.touch .hud-l { gap: 2px; }
   body.touch .lname { font-size: 20px; pointer-events: auto; }
@@ -146,9 +146,9 @@
     body.touch .hud-l { max-width: calc(100vw - 32px); top: calc(64px + env(safe-area-inset-top, 0px)); }
   }
   @media (max-height: 360px) {
-    body.touch .stick { width: 116px; height: 116px; }
-    body.touch .tb { width: 56px; height: 56px; }
-    body.touch .tb.big { width: 76px; height: 76px; }
+    body.touch .stick { width: 92px; height: 92px; }
+    body.touch .tb { width: 46px; height: 46px; }
+    body.touch .tb.big { width: 62px; height: 62px; }
     body.touch .hint { left: calc(148px + env(safe-area-inset-left, 0px)); right: calc(176px + env(safe-area-inset-right, 0px)); }
     body.touch .goal { display: none; }
   }
@@ -2782,7 +2782,8 @@ function stickUpdate(e) {
   const r = stick.getBoundingClientRect();
   let dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
   const d = Math.hypot(dx, dy); if (d > 1) { dx /= d; dy /= d; }
-  knob.style.transform = "translate(" + dx * 40 + "px, " + dy * 40 + "px)";
+  const travel = r.width * 0.3;
+  knob.style.transform = "translate(" + dx * travel + "px, " + dy * travel + "px)";
   keys.TouchLeft = dx < -0.3; keys.TouchRight = dx > 0.3;
   keys.TouchUp = dy < -0.5; keys.TouchDown = dy > 0.5;
 }
