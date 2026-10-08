@@ -130,16 +130,12 @@
   body.touch .hint { display: none !important; }
 
   #touch { position: fixed; inset: 0; pointer-events: none; }
-  body.left .stickzone { left: auto; right: 0; }
   body.left .stick { left: auto; right: calc(20px + env(safe-area-inset-right, 0px)); }
   body.left .tbtns { right: auto; left: calc(20px + env(safe-area-inset-left, 0px)); flex-direction: row-reverse; }
   body.fade #touch .stick, body.fade #touch .tb { opacity: .45; }
   body.fade #touch .tb.on { opacity: .8; }
   #settings .row button[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
   body.touch .win .row button { min-height: 52px; padding-inline: 20px; font-size: 16px; }
-  .stickzone { position: absolute; left: 0; bottom: 0; width: 42%; height: 62%; pointer-events: auto; touch-action: none; }
-  .stick.float { transition: none; }
-  .stick:not(.float) { transition: left .12s, top .12s; }
   .tcol { display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .tb.big.hook { border-color: var(--teal); color: var(--teal); }
   body.touch .tb.big#tJump { width: 92px; height: 92px; font-size: 21px; }
@@ -207,14 +203,10 @@
 </div>
 
 <div id="touch" hidden>
-  <div class="stickzone" id="stickZone"></div>
   <div class="stick" id="stick" aria-label="이동 스틱"><div class="knob" id="knob"></div></div>
   <div class="tbtns">
     <button class="tb" id="tRelease" type="button">놓기</button>
-    <div class="tcol">
-      <button class="tb big hook" id="tHook" type="button">후크</button>
-      <button class="tb big" id="tJump" type="button">점프</button>
-    </div>
+    <button class="tb big" id="tJump" type="button">점프</button>
   </div>
 </div>
 <div id="toast"></div>
@@ -3265,23 +3257,7 @@ stick.addEventListener("pointerdown", (e) => {
   try { stick.setPointerCapture(e.pointerId); } catch (err) {}
   stickUpdate(e);
 });
-// Floating stick: touching anywhere in the lower-left zone centres the stick under the thumb.
-const zone = $("stickZone");
-zone.addEventListener("pointerdown", (e) => {
-  e.preventDefault(); ensureAudio();
-  const r = stick.getBoundingClientRect(), half = r.width / 2;
-  stick.classList.add("float");
-  stick.style.left = (e.clientX - half) + "px"; stick.style.top = (e.clientY - half) + "px"; stick.style.bottom = "auto";
-  stickId = e.pointerId;
-  try { zone.setPointerCapture(e.pointerId); } catch (err) {}
-  stickUpdate(e);
-});
-zone.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickUpdate(e); });
-const zoneEnd = (e) => {
-  if (e.pointerId !== stickId) return;
-  stickEnd(); stick.classList.remove("float"); stick.style.left = stick.style.top = stick.style.bottom = "";
-};
-zone.addEventListener("pointerup", zoneEnd); zone.addEventListener("pointercancel", zoneEnd);
+
 stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickUpdate(e); });
 stick.addEventListener("pointerup", (e) => { if (e.pointerId === stickId) stickEnd(); });
 stick.addEventListener("pointercancel", (e) => { if (e.pointerId === stickId) stickEnd(); });
@@ -3293,7 +3269,6 @@ function holdButton(el, down, up) {
 }
 holdButton($("tJump"), () => { keys.Space = true; if (mode === "play") jumpQueued = true; }, () => { keys.Space = false; });
 holdButton($("tRelease"), () => { if (mode === "play") releaseHook(); });
-holdButton($("tHook"), fireAuto);
 // ---------- install as an app ----------
 let installEvt = null;
 const standalone = () => (window.matchMedia && matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches) || navigator.standalone === true;
