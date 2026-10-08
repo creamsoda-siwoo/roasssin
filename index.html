@@ -90,18 +90,15 @@
   body.touch .touch-only { display: revert; }
   body.touch .mouse-only { display: none; }
   body.touch .hud kbd { display: none; }
+  body.touch .hint { display: none !important; }
 
   #touch { position: fixed; inset: 0; pointer-events: none; }
   .stick { position: absolute; left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: 136px; height: 136px; border-radius: 50%; border: 2px solid var(--line); background: rgba(14, 16, 32, .45); pointer-events: auto; touch-action: none; }
   .stick .knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(236, 228, 207, .2); border: 2px solid rgba(236, 228, 207, .5); }
-  .stick .lbl { position: absolute; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--paper-dim); pointer-events: none; }
-  .stick .lbl.up { top: 6px; } .stick .lbl.dn { bottom: 6px; }
   .tbtns { position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 14px; align-items: flex-end; pointer-events: auto; }
   .tb { width: 64px; height: 64px; padding: 0; border-radius: 50%; font-size: 14px; touch-action: none; background: rgba(14, 16, 32, .55); }
   .tb.big { width: 88px; height: 88px; font-family: var(--display); font-size: 20px; border-color: var(--rope); color: var(--rope); }
   .tb.on { background: rgba(220, 165, 74, .35); }
-  #rotate { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); padding: 10px 16px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; pointer-events: none; display: none; text-align: center; }
-  @media (orientation: portrait) { body.touch.playing #rotate { display: block; } }
   body.touch .hud-l { gap: 2px; }
   body.touch .lname { font-size: 20px; pointer-events: auto; }
   body.touch .goal { font-size: 12px; }
@@ -113,7 +110,6 @@
   @media (orientation: portrait) {
     body.touch .hint { left: calc(16px + env(safe-area-inset-left, 0px)); right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(176px + env(safe-area-inset-bottom, 0px)); }
     body.touch .hud-l { max-width: calc(100vw - 32px); top: calc(64px + env(safe-area-inset-top, 0px)); }
-    body.touch #rotate { top: 38%; max-width: calc(100vw - 48px); }
   }
   @media (max-height: 360px) {
     body.touch .stick { width: 116px; height: 116px; }
@@ -151,13 +147,12 @@
 </div>
 
 <div id="touch" hidden>
-  <div class="stick" id="stick" aria-label="이동 스틱"><span class="lbl up">감기</span><div class="knob" id="knob"></div><span class="lbl dn">풀기</span></div>
+  <div class="stick" id="stick" aria-label="이동 스틱"><div class="knob" id="knob"></div></div>
   <div class="tbtns">
     <button class="tb" id="tRelease" type="button">놓기</button>
     <button class="tb big" id="tJump" type="button">점프</button>
   </div>
 </div>
-<div id="rotate">가로로 돌리면 더 넓게 보입니다</div>
 <div id="toast"></div>
 <div id="card"><div class="act" id="cAct"></div><div class="t" id="cName"></div></div>
 
