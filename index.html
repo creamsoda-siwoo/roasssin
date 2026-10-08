@@ -67,14 +67,11 @@
   .seal { flex: none; width: 54px; height: 54px; border: 3px solid var(--vermilion); color: var(--vermilion); display: grid; place-items: center; font-family: var(--display); font-size: 20px; line-height: 1; transform: rotate(-6deg); border-radius: 4px; margin-bottom: 8px; }
   .lead { margin: 0; max-width: 46ch; color: var(--paper-dim); line-height: 1.6; max-width: 46ch; }
   .levels { display: grid; gap: 6px; }
-  .lv { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; }
-  .lv .n { font-family: var(--display); font-size: 22px; color: var(--rope); }
-  .lv .nm { display: grid; gap: 2px; min-width: 0; }
-  .lv .nm b { font-weight: 600; }
-  .lv .nm small { color: var(--paper-dim); font-size: 12px; }
-  .lv .best { font-size: 12px; color: var(--paper-dim); font-variant-numeric: tabular-nums; }
+  .lv { display: grid; place-items: center; gap: 1px; padding: 8px 2px 6px; min-height: 50px; }
+  .lv.clear { border-color: rgba(220, 165, 74, .45); }
+  .lv .n { font-family: var(--display); font-size: 19px; color: var(--rope); line-height: 1; }
+  .lv .best { font-size: 10px; color: var(--paper-dim); font-variant-numeric: tabular-nums; }
   .sr { display: grid; gap: 8px; }
-  .sr h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--rope); }
   .sr p { margin: 0; font-size: 12px; color: var(--paper-dim); }
   .srgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
   .srb { display: grid; gap: 2px; text-align: left; padding: 8px 12px; }
@@ -85,11 +82,16 @@
   .stat.run b { color: var(--rope); }
   #bHard[aria-pressed="true"] { border-color: var(--vermilion); color: var(--vermilion); background: rgba(208, 88, 63, 0.12); }
   .hardnote { margin: 0; font-size: 12px; color: var(--vermilion); line-height: 1.6; }
-  body.hard .lv .n, body.hard .sr h2 { color: var(--vermilion); }
+  body.hard .lv .n, body.hard .fold summary { color: var(--vermilion); }
+  .fold { border-top: 1px solid var(--line); padding-top: 10px; }
+  .fold summary { cursor: pointer; font-family: var(--display); font-size: 20px; color: var(--rope); list-style: none; }
+  .fold summary::-webkit-details-marker { display: none; }
+  .fold summary::after { content: " +"; color: var(--paper-dim); font-family: var(--body); font-size: 16px; }
+  .fold[open] summary::after { content: " −"; }
+  .fold[open] > :not(summary) { margin-top: 10px; }
   .controls { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; color: var(--paper-dim); align-items: center; }
   .controls dt { justify-self: start; }
   .controls dd { margin: 0; }
-  .touchnote { color: var(--vermilion); font-size: 13px; margin: 0; }
   .win h2 { font-family: var(--display); font-weight: 400; font-size: clamp(40px, 8vw, 72px); margin: 0; line-height: 1; }
   .winstats { display: flex; gap: 28px; flex-wrap: wrap; }
   .winstats div { display: grid; }
@@ -103,7 +105,7 @@
   body { word-break: keep-all; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   button { touch-action: manipulation; }
   .overlay { touch-action: pan-y; }
-  .levels { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .levels { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); }
   .hint { transition: opacity .6s; }
   .hint.faded { opacity: 0; }
   .touch-only { display: none; }
@@ -113,6 +115,11 @@
   body.touch .hint { display: none !important; }
 
   #touch { position: fixed; inset: 0; pointer-events: none; }
+  .stickzone { position: absolute; left: 0; bottom: 0; width: 42%; height: 62%; pointer-events: auto; touch-action: none; }
+  .stick.float { transition: none; }
+  .stick:not(.float) { transition: left .12s, top .12s; }
+  .tcol { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  .tb.big.hook { border-color: var(--teal); color: var(--teal); }
   .stick { position: absolute; left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: 136px; height: 136px; border-radius: 50%; border: 2px solid var(--line); background: rgba(14, 16, 32, .45); pointer-events: auto; touch-action: none; }
   .stick .knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(236, 228, 207, .2); border: 2px solid rgba(236, 228, 207, .5); }
   .tbtns { position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 14px; align-items: flex-end; pointer-events: auto; }
@@ -150,8 +157,7 @@
     .brand h1 br { display: none; }
     .seal { width: 40px; height: 40px; font-size: 14px; margin-bottom: 2px; }
     .lead { display: none; }
-    .lv { padding: 7px 12px; }
-    .levels { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+    .lv { min-height: 44px; padding: 6px 2px 4px; }
   }
   @media (prefers-reduced-motion: reduce) { #toast, #card { transition: none; } }
 </style>
@@ -169,7 +175,6 @@
     <div class="stat run" id="sRun" hidden><span>스피드런</span><b id="hRun">0.0</b></div>
     <div class="stat"><span>시간</span><b id="hTime">0.0</b></div>
     <div class="stat"><span>사망</span><b id="hDeaths">0</b></div>
-    <button id="bMute" type="button" aria-label="소리 켜기/끄기"><kbd>M</kbd> <span id="muteLbl">소리</span></button>
     <button id="bRestart" type="button"><kbd>R</kbd> 재시작</button>
     <button id="bMenu" type="button"><kbd>Esc</kbd> 메뉴</button>
   </div>
@@ -177,10 +182,14 @@
 </div>
 
 <div id="touch" hidden>
+  <div class="stickzone" id="stickZone"></div>
   <div class="stick" id="stick" aria-label="이동 스틱"><div class="knob" id="knob"></div></div>
   <div class="tbtns">
     <button class="tb" id="tRelease" type="button">놓기</button>
-    <button class="tb big" id="tJump" type="button">점프</button>
+    <div class="tcol">
+      <button class="tb big hook" id="tHook" type="button">후크</button>
+      <button class="tb big" id="tJump" type="button">점프</button>
+    </div>
   </div>
 </div>
 <div id="toast"></div>
@@ -193,14 +202,16 @@
       <div class="seal" aria-hidden="true">刺<br>客</div>
     </div>
     <p class="lead">밤의 성채에 숨어든 자객. 쇠갈고리 하나로 들보와 벽을 타고, 막마다 다른 장치를 풀어 출구까지 가라.</p>
-    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">하드 모드 끔</button><button class="touch-only" id="bFull" type="button">전체 화면으로</button></div>
+    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">하드 모드 끔</button><button id="bSound" type="button">소리 켬</button><button class="touch-only" id="bFull" type="button">전체 화면으로</button></div>
     <p class="hardnote" id="hardNote" hidden>하드 모드: 경비 시야가 넓고 순식간에 알아챈다 · 순찰이 빠르다 · 파수꾼이 더 자주 돌아본다 · 금 간 들보가 더 빨리 무너지고 늦게 되살아난다. 기록은 따로 남는다.</p>
-    <section class="sr" aria-labelledby="srTitle">
-      <h2 id="srTitle">스피드런</h2>
+    <div class="levels" id="levelList"></div>
+    <details class="fold sr">
+      <summary id="srTitle">스피드런</summary>
       <p>구간의 막을 쉬지 않고 이어서 깬다. 시간은 막 사이에 멈추고, 죽거나 재시작해도 계속 흐른다. 구간의 막을 모두 열어야 도전할 수 있다.</p>
       <div class="srgrid" id="srList"></div>
-    </section>
-    <div class="levels" id="levelList"></div>
+    </details>
+    <details class="fold">
+      <summary>조작법</summary>
     <dl class="controls touch-only">
       <dt><kbd>화면 누르기</kbd></dt><dd>누른 채로 조준하고, 떼면 후크 발사 · 가까운 들보에 자동으로 맞춰 준다</dd>
       <dt><kbd>왼쪽 스틱</kbd></dt><dd>좌우 이동·흔들기 · 위로 밀면 줄 감기, 아래로 밀면 줄 풀기</dd>
@@ -215,6 +226,7 @@
       <dt><kbd>우클릭</kbd> <kbd>Q</kbd></dt><dd>줄 놓기</dd>
       <dt><kbd>R</kbd> <kbd>M</kbd></dt><dd>재시작 · 소리 켜기/끄기</dd>
     </dl>
+    </details>
   </div>
 </div>
 
@@ -241,9 +253,9 @@
 
 // ---------- constants ----------
 const TS = 32, VW = 960, VH = 540;
-const GRAV = 1700, MAXFALL = 900, RUN = 220, ACC_G = 2400, ACC_A = 1200, JUMP = 520;
-const HOOK_SPEED = 1600, HOOK_RANGE = 384, REEL = 280, ROPE_MIN = 22, ROPE_MAX = 420;
-const SWING_ACC = 950, PULL_SPEED = 430;
+const GRAV = 1700, MAXFALL = 860, RUN = 220, ACC_G = 2600, ACC_A = 1700, JUMP = 520;
+const HOOK_SPEED = 2100, HOOK_RANGE = 384, REEL = 280, ROPE_MIN = 22, ROPE_MAX = 420;
+const SWING_ACC = 1150, PULL_SPEED = 430;
 const SPRING = 930, WIND_UP = 300, WIND_ACC = 2600;
 const VIS_HALF = 0.48;
 // Difficulty-dependent tuning; applyDifficulty() sets these for normal or hard mode.
@@ -1430,7 +1442,7 @@ const LEVELS = [
       "X                       XXXXXXX                        X",
       "X                       XXXXXXX                        X",
       "X                       XXXXXXX                        X",
-      "X P   !      T      !   XXXXXXX  !      T      !    E  X",
+      "X P       !    T    !   XXXXXXX  !      T      !    E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2049,7 +2061,7 @@ const LEVELS = [
       "X                                                              X",
       "X                                                              X",
       "X                                                              X",
-      "X P       Y       !    T    !       V         Y       U     E  X",
+      "X P          Y    !    T    !       V         Y       U     E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2241,8 +2253,8 @@ const LEVELS = [
       "X        WWWW  X",
       "X        WWWW  X",
       "X        WWWW  X",
-      "X        WWWW  X",
-      "X        WWWW  X",
+      "X   WWWW WWWW  X",
+      "X   WWWW WWWW  X",
       "X   WWWW WWWW  X",
       "X   WWWW WWWW  X",
       "X   WWWW ####  X",
@@ -2702,7 +2714,7 @@ document.addEventListener("visibilitychange", () => {
 });
 function toggleMute() {
   muted = !muted;
-  $("muteLbl").textContent = muted ? "소리 끔" : "소리";
+  $("bSound").textContent = muted ? "소리 끔" : "소리 켬";
   toast(muted ? "소리 끔" : "소리 켬");
 }
 function setTouchMode(on) {
@@ -2748,8 +2760,8 @@ function stickUpdate(e) {
   let dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
   const d = Math.hypot(dx, dy); if (d > 1) { dx /= d; dy /= d; }
   knob.style.transform = "translate(" + dx * 40 + "px, " + dy * 40 + "px)";
-  keys.TouchLeft = dx < -0.35; keys.TouchRight = dx > 0.35;
-  keys.TouchUp = dy < -0.45; keys.TouchDown = dy > 0.45;
+  keys.TouchLeft = dx < -0.3; keys.TouchRight = dx > 0.3;
+  keys.TouchUp = dy < -0.5; keys.TouchDown = dy > 0.5;
 }
 function stickEnd() {
   stickId = null; knob.style.transform = "";
@@ -2760,6 +2772,23 @@ stick.addEventListener("pointerdown", (e) => {
   try { stick.setPointerCapture(e.pointerId); } catch (err) {}
   stickUpdate(e);
 });
+// Floating stick: touching anywhere in the lower-left zone centres the stick under the thumb.
+const zone = $("stickZone");
+zone.addEventListener("pointerdown", (e) => {
+  e.preventDefault(); ensureAudio();
+  const r = stick.getBoundingClientRect(), half = r.width / 2;
+  stick.classList.add("float");
+  stick.style.left = (e.clientX - half) + "px"; stick.style.top = (e.clientY - half) + "px"; stick.style.bottom = "auto";
+  stickId = e.pointerId;
+  try { zone.setPointerCapture(e.pointerId); } catch (err) {}
+  stickUpdate(e);
+});
+zone.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickUpdate(e); });
+const zoneEnd = (e) => {
+  if (e.pointerId !== stickId) return;
+  stickEnd(); stick.classList.remove("float"); stick.style.left = stick.style.top = stick.style.bottom = "";
+};
+zone.addEventListener("pointerup", zoneEnd); zone.addEventListener("pointercancel", zoneEnd);
 stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickUpdate(e); });
 stick.addEventListener("pointerup", (e) => { if (e.pointerId === stickId) stickEnd(); });
 stick.addEventListener("pointercancel", (e) => { if (e.pointerId === stickId) stickEnd(); });
@@ -2770,6 +2799,7 @@ function holdButton(el, down, up) {
 }
 holdButton($("tJump"), () => { keys.Space = true; if (mode === "play") jumpQueued = true; }, () => { keys.Space = false; });
 holdButton($("tRelease"), () => { if (mode === "play") releaseHook(); });
+holdButton($("tHook"), fireAuto);
 $("bFull").addEventListener("click", () => {
   const el = document.documentElement;
   const req = el.requestFullscreen || el.webkitRequestFullscreen;
@@ -2943,6 +2973,35 @@ function probeAim() {
   return a;
 }
 
+// Auto-aim for the touch hook button: sweep the upper half-circle and pick the best target,
+// favouring wooden anchors up and ahead of the player and skipping the beam already held.
+function autoTarget() {
+  const o = handPos(), p = L.player, h = L.hook;
+  const dir = keys.TouchLeft ? -1 : keys.TouchRight ? 1 : p.face || 1;
+  const want = -Math.PI / 2 + dir * 0.75;
+  let best = null, bestScore = Infinity;
+  for (let a = -Math.PI - 0.25; a <= 0.25; a += 0.02) {
+    const r = probeDir(o, a);
+    if (!usefulHit(r.hit)) continue;
+    const d = Math.hypot(r.x - o.x, r.y - o.y);
+    if (d < 40) continue;
+    if (h.state === "attached" && Math.hypot(r.x - h.ax, r.y - h.ay) < 56) continue;
+    let diff = Math.abs(a - want); if (diff > Math.PI) diff = 2 * Math.PI - diff;
+    let score = diff * 2 + Math.abs(d - 200) / 160 + (r.hit.kind === "anchor" ? 0 : 1.2);
+    if (h.state === "attached" && dir * (r.x - h.ax) < 32) score += 1.5;
+    if (score < bestScore) { bestScore = score; best = r; }
+  }
+  return best;
+}
+function fireAuto() {
+  if (mode !== "play") return;
+  const a = autoTarget();
+  if (!a) { sfx.clank(); return; }
+  const h = L.hook, o = handPos();
+  if (h.state === "pulling" && h.crate) h.crate.pulled = false;
+  Object.assign(h, { state: "flying", x: o.x, y: o.y, dx: a.dx, dy: a.dy, dist: 0, crate: null, ox: o.x });
+  sfx.fire();
+}
 function fireHook() {
   const h = L.hook, o = handPos(), m = mouseWorld();
   if (Math.hypot(m.x - o.x, m.y - o.y) < 2) return;
@@ -2993,6 +3052,7 @@ function updateHook(dt) {
 }
 
 function onHookHit(hit) {
+  if (touchMode && navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
   const h = L.hook, o = handPos();
   if (hit.kind === "anchor") {
     let ax = h.x, ay = h.y;
@@ -3031,8 +3091,8 @@ function updatePlayer(dt) {
   const hooked = h.state === "attached";
   p.ground = onGround(p);
 
-  if (jumpQueued) { p.jbuf = 0.12; jumpQueued = false; } else p.jbuf -= dt;
-  if (p.ground) p.coyote = 0.1; else p.coyote -= dt;
+  if (jumpQueued) { p.jbuf = 0.18; jumpQueued = false; } else p.jbuf -= dt;
+  if (p.ground) p.coyote = 0.15; else p.coyote -= dt;
 
   if (p.ground) {
     p.vx = approach(p.vx, ix * RUN, ACC_G * dt);
@@ -3046,7 +3106,7 @@ function updatePlayer(dt) {
   } else if (ix) {
     if (Math.sign(p.vx) !== ix || Math.abs(p.vx) < RUN) p.vx = approach(p.vx, ix * RUN, ACC_A * dt);
   } else {
-    p.vx = approach(p.vx, 0, 260 * dt);
+    p.vx = approach(p.vx, 0, 700 * dt);
   }
   if (ix) p.face = ix; else if (Math.abs(p.vx) > 40) p.face = Math.sign(p.vx);
 
@@ -3405,7 +3465,10 @@ function renderLevelList() {
     const locked = i >= save.unlocked;
     b.disabled = locked;
     const best = bestTable()[i];
-    b.innerHTML = `<span class="n">${i + 1}</span><span class="nm"><b>${lv.name}</b><small>${locked ? "앞 막을 끝내면 열린다" : lv.goal}</small></span><span class="best">${best ? best.time.toFixed(1) + "초" : ""}</span>`;
+    if (best) b.classList.add("clear");
+    b.title = `${i + 1}막 · ${lv.name}` + (locked ? " (잠김)" : best ? ` · 최고 ${best.time.toFixed(1)}초` : "");
+    b.setAttribute("aria-label", b.title);
+    b.innerHTML = `<span class="n">${i + 1}</span><span class="best">${best ? best.time.toFixed(1) : locked ? "🔒" : ""}</span>`;
     b.addEventListener("click", () => { ensureAudio(); startLevel(i, false); });
     box.appendChild(b);
   });
@@ -3430,7 +3493,7 @@ function renderLevelList() {
 }
 $("bRestart").addEventListener("click", () => { restartLevel(); cv.focus(); });
 $("bCont").addEventListener("click", () => { ensureAudio(); startLevel(Math.min(LEVELS.length, save.unlocked) - 1, false); });
-$("bMute").addEventListener("click", () => { ensureAudio(); toggleMute(); });
+$("bSound").addEventListener("click", () => { ensureAudio(); toggleMute(); });
 $("bHard").addEventListener("click", () => {
   hard = !hard; save.hard = hard; writeSave();
   applyDifficulty(); renderLevelList();
