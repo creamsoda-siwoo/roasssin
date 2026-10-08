@@ -130,6 +130,13 @@
   body.touch .hint { display: none !important; }
 
   #touch { position: fixed; inset: 0; pointer-events: none; }
+  body.left .stickzone { left: auto; right: 0; }
+  body.left .stick { left: auto; right: calc(20px + env(safe-area-inset-right, 0px)); }
+  body.left .tbtns { right: auto; left: calc(20px + env(safe-area-inset-left, 0px)); flex-direction: row-reverse; }
+  body.fade #touch .stick, body.fade #touch .tb { opacity: .45; }
+  body.fade #touch .tb.on { opacity: .8; }
+  #settings .row button[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+  body.touch .win .row button { min-height: 52px; padding-inline: 20px; font-size: 16px; }
   .stickzone { position: absolute; left: 0; bottom: 0; width: 42%; height: 62%; pointer-events: auto; touch-action: none; }
   .stick.float { transition: none; }
   .stick:not(.float) { transition: left .12s, top .12s; }
@@ -220,7 +227,18 @@
       <div class="seal" aria-hidden="true">刺<br>客</div>
     </div>
     <p class="lead">밤의 성채에 숨어든 자객. 쇠갈고리 하나로 들보와 벽을 타고, 막마다 다른 장치를 풀어 출구까지 가라.</p>
-    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">하드 모드 끔</button><button id="bSound" type="button">소리 켬</button><button class="touch-only" id="bBig" type="button" aria-pressed="false">큰 버튼 끔</button><button class="touch-only" id="bFull" type="button">전체 화면으로</button><button id="bInstall" type="button" hidden>앱 설치</button></div>
+    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">하드 모드 끔</button><button id="bInstall" type="button" hidden>앱 설치</button></div>
+    <details class="fold" id="settings">
+      <summary>설정</summary>
+      <div class="row">
+        <button id="bSound" type="button">소리 켬</button>
+        <button class="touch-only" id="bBig" type="button" aria-pressed="false">큰 버튼 끔</button>
+        <button class="touch-only" id="bLeft" type="button" aria-pressed="false">왼손 모드 끔</button>
+        <button class="touch-only" id="bFade" type="button" aria-pressed="false">버튼 투명 끔</button>
+        <button class="touch-only" id="bVib" type="button" aria-pressed="true">진동 켬</button>
+        <button class="touch-only" id="bFull" type="button">전체 화면으로</button>
+      </div>
+    </details>
     <p class="hardnote installnote" id="installNote" hidden></p>
     <p class="hardnote" id="hardNote" hidden>하드 모드: 경비 시야가 넓고 순식간에 알아챈다 · 순찰이 빠르다 · 파수꾼이 더 자주 돌아본다 · 금 간 들보가 더 빨리 무너지고 늦게 되살아난다. 기록은 따로 남는다.</p>
     <div class="levels" id="levelList"></div>
@@ -3074,9 +3092,9 @@ const SAVE_KEY = "rope-assassin-v1";
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, big: !!s.big };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, big: !!s.big, left: !!s.left, fade: !!s.fade, vib: s.vib !== false };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, hard: false };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, hard: false, vib: true };
 }
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 const save = loadSave();
@@ -3267,8 +3285,9 @@ zone.addEventListener("pointerup", zoneEnd); zone.addEventListener("pointercance
 stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickUpdate(e); });
 stick.addEventListener("pointerup", (e) => { if (e.pointerId === stickId) stickEnd(); });
 stick.addEventListener("pointercancel", (e) => { if (e.pointerId === stickId) stickEnd(); });
+function buzz(ms) { if (save.vib && touchMode && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} } }
 function holdButton(el, down, up) {
-  el.addEventListener("pointerdown", (e) => { e.preventDefault(); ensureAudio(); el.classList.add("on"); try { el.setPointerCapture(e.pointerId); } catch (err) {} down(); });
+  el.addEventListener("pointerdown", (e) => { e.preventDefault(); ensureAudio(); buzz(8); el.classList.add("on"); try { el.setPointerCapture(e.pointerId); } catch (err) {} down(); });
   const end = () => { el.classList.remove("on"); if (up) up(); };
   el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
 }
@@ -3554,7 +3573,7 @@ function updateHook(dt) {
 }
 
 function onHookHit(hit) {
-  if (touchMode && navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+  buzz(12);
   const h = L.hook, o = handPos();
   if (hit.kind === "anchor") {
     let ax = h.x, ay = h.y;
@@ -3789,7 +3808,7 @@ function die(reason) {
   burst(p.x + p.w / 2, p.y + p.h / 2, 10, "#c8423b", 200);
   L.hook.state = "idle";
   sfx.die();
-  if (touchMode && navigator.vibrate) { try { navigator.vibrate([30, 40, 30]); } catch (e) {} }
+  buzz([30, 40, 30]);
   toast(reason, true);
 }
 
@@ -4041,6 +4060,11 @@ function renderLevelList() {
     b.addEventListener("click", () => { ensureAudio(); startLevel(i, false); });
     box.appendChild(b);
   });
+  // bring the latest unlocked stage into view so long lists don't need scrolling
+  if (touchMode && next > 12) {
+    const el = $("lv" + (next - 1));
+    requestAnimationFrame(() => { try { el.scrollIntoView({ block: "center" }); } catch (e) {} });
+  }
   $("bHard").textContent = hard ? "하드 모드 켬" : "하드 모드 끔";
   $("bHard").setAttribute("aria-pressed", String(hard));
   $("hardNote").hidden = !hard;
@@ -4070,6 +4094,17 @@ function applyBig() {
 }
 applyBig();
 $("bBig").addEventListener("click", () => { save.big = !save.big; writeSave(); applyBig(); });
+function applyToggles() {
+  for (const [id, key, label] of [["bLeft", "left", "왼손 모드"], ["bFade", "fade", "버튼 투명"], ["bVib", "vib", "진동"]]) {
+    $(id).textContent = label + (save[key] ? " 켬" : " 끔");
+    $(id).setAttribute("aria-pressed", String(!!save[key]));
+  }
+  document.body.classList.toggle("left", !!save.left);
+  document.body.classList.toggle("fade", !!save.fade);
+}
+applyToggles();
+for (const [id, key] of [["bLeft", "left"], ["bFade", "fade"], ["bVib", "vib"]])
+  $(id).addEventListener("click", () => { save[key] = !save[key]; writeSave(); applyToggles(); if (key === "vib") buzz(20); });
 $("bHard").addEventListener("click", () => {
   hard = !hard; save.hard = hard; writeSave();
   applyDifficulty(); renderLevelList();
