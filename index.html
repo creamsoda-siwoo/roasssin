@@ -286,7 +286,7 @@ const STEP = 1 / 120;
 // G gate, closed until a switch flips  g gate, open until a switch flips
 // C rotten beam (hookable, breaks soon after the hook bites, regrows)
 // D locked door (key)  H shutter (open while every _ plate is pressed)  E exit
-// O / Q teleport doors (two of each letter, linked)  I ice floor (solid, slippery)
+// F checkpoint flag (touch it and you respawn there)  O / Q teleport doors (two of each letter, linked)  I ice floor (solid, slippery)
 // J spring pad (solid, launches you upward)  W updraft (rising air, lifts you while inside)
 // P start  K key  B crate  T patrol guard  Y/U static guard facing left/right  V watcher (turns around)  ! patrol turn marker
 const LEVELS = [
@@ -701,7 +701,7 @@ const LEVELS = [
       "X                                            X   X",
       "X                                            D   X",
       "X                                            D   X",
-      "X P                     K                    D E X",
+      "X P                    FK                    D E X",
       "X####                  XXX                #######X",
       "X####                  XXX                #######X",
       "X####                  XXX                #######X",
@@ -751,7 +751,7 @@ const LEVELS = [
       "X             H                G             D           X",
       "X             H                G             D           X",
       "X             H                G             D           X",
-      "X P   B   _   H^^^^^^^^^^^^    G      V      D  U    E   X",
+      "X P   B   _   H^^^^^^^^^^^^ F  G      V      D  U    E   X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -768,7 +768,7 @@ const LEVELS = [
       "X                                                          X",
       "X                                                          X",
       "X P                                                      E X",
-      "X####                                                  ####X",
+      "X####                       F                          ####X",
       "X####                      XXX                         ####X",
       "X####                      XXX                         ####X",
       "X####                      XXX                         ####X",
@@ -866,40 +866,40 @@ const LEVELS = [
   },
   {
     name: "썩은 탑",
-    goal: "무너지는 들보만으로 탑 꼭대기까지 올라라",
-    hint: "모든 들보가 금이 가 있다. 후크를 걸자마자 다음 들보를 노려라. 부서진 들보는 몇 초 뒤 되살아난다.",
+    goal: "단단한 들보와 금 간 들보를 번갈아 타고 탑 꼭대기까지 올라라",
+    hint: "금 간 들보에서는 곧바로 위쪽 단단한 들보에 후크를 다시 걸어라. 오른쪽 나무 벽을 타고 올라가도 된다. 떨어져도 바닥은 안전하다.",
     map: [
-      "XXXX####XXXXXX",
+      "XXX######XXXXX",
       "X            X",
       "X         E  X",
       "X        XXXXX",
-      "X            X",
-      "X            X",
-      "X  CCC       X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X       CCC  X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X  CCC       X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X       CCC  X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X  CCC       X",
-      "X            X",
-      "X            X",
-      "X            X",
-      "X P ^^^^^^^^^X",
+      "X           #X",
+      "X           #X",
+      "X  ####     #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X      CCCC #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X  ####     #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X      CCCC #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X  ####     #X",
+      "X           #X",
+      "X           #X",
+      "X           #X",
+      "X P         #X",
       "XXXXXXXXXXXXXX",
     ],
   },
@@ -947,22 +947,22 @@ const LEVELS = [
   },
   {
     name: "셔터 회랑",
-    goal: "발판 두 개로 셔터를 열고, 무너지는 들보를 건너 스위치 문을 지나라",
-    hint: "상자 하나는 바닥에, 하나는 선반 위에 있다. 셔터를 지나면 금 간 들보로 가시밭을 건너고, 벽의 스위치를 후크로 쳐라. 막혔으면 <kbd>R</kbd>.",
-    touchHint: "상자 하나는 바닥에, 하나는 선반 위에 있다. 셔터를 지나면 금 간 들보로 가시밭을 건너고, 벽의 스위치를 후크로 쳐라. 막혔으면 재시작.",
+    goal: "상자 두 개로 셔터를 열고, 들보로 가시밭을 건너 스위치 문을 지나라",
+    hint: "첫 상자는 앞의 발판으로 밀고, 그 상자를 뛰어넘어 둘째 상자를 다음 발판으로 민다. 가시밭 가운데 기둥에서 쉬어 가라. 막혔으면 <kbd>R</kbd>.",
+    touchHint: "첫 상자는 앞의 발판으로 밀고, 그 상자를 뛰어넘어 둘째 상자를 다음 발판으로 민다. 가시밭 가운데 기둥에서 쉬어 가라. 막혔으면 재시작.",
     map: [
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
       "X                    X                   X             X",
       "X                    X                   X             X",
-      "X                    X  CCC   CCC        X             X",
+      "X                    X ####   ####       X             X",
       "X                    X                   X             X",
       "X                    X                   S             X",
-      "X              B     X                   X             X",
-      "X             XXX    X                   X             X",
-      "X                    H                   G             X",
-      "X                    H                   G             X",
-      "X                    H                   G             X",
-      "X P  B   _        _  H^^^^^^^^^^^^^^     G        E    X",
+      "X                    X                   X             X",
+      "X                    X                   X             X",
+      "X                    H     XX            G             X",
+      "X                    H     XX            G             X",
+      "X                    H     XX            G             X",
+      "X P  B   _   B   _   H^^^^^XX^^^^^  F    G        E    X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -985,7 +985,7 @@ const LEVELS = [
       "X              D                   G               H             X",
       "X              D                   G               H             X",
       "X              D                   G               H             X",
-      "X P            D  ^^^^^^^^^^^^^^   G  !   T   ! B _H    U     E  X",
+      "X P            D  ^^^^^^^^^^^^^^ F G  !   T   ! B _H    U     E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1203,7 +1203,7 @@ const LEVELS = [
       "X             H                  G                 D                 X",
       "X             H                  G                 D                 X",
       "X             H                  G                 D                 X",
-      "X P    B   _  H ^^^^^^^^^^^^^^   G     V           D    U        E   X",
+      "X P    B   _  H ^^^^^^^^^^^^^^ F G     V           D    U        E   X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1219,7 +1219,7 @@ const LEVELS = [
       "X                                                    X",
       "X                                                    X",
       "X                                                    X",
-      "X P                                                E X",
+      "X P              F               F                 E X",
       "X####            XX              XX              ####X",
       "X####            XX              XX              ####X",
       "X####            XX              XX              ####X",
@@ -1393,7 +1393,7 @@ const LEVELS = [
       "X                                                       X    X",
       "X                                                       D    X",
       "X                                                       D    X",
-      "X P                          K                          D E  X",
+      "X P                         FK                          D E  X",
       "X####                       XXX                       #######X",
       "X####                       XXX                       #######X",
       "X####                       XXX                       #######X",
@@ -1422,7 +1422,7 @@ const LEVELS = [
       "X            H                  G              XXX   D                   X",
       "X            H                  G              XXX   D                   X",
       "X            H                  G              XXX   D                   X",
-      "X P   B   _  H ^^^^^^^^^^^^^^   G  !    T    ! XXX   D    V     U     E  X",
+      "X P   B   _  H ^^^^^^^^^^^^^^ F G  !    T    ! XXX   D    V     U     E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1662,7 +1662,7 @@ const LEVELS = [
       "X            H                  G                  XXX  D                    X",
       "X            H                  G                  XXX  D                    X",
       "X            H                  G                  XXX  D                    X",
-      "X P   B   _  H ^^^^^^^^^^^^^^   G  !    T    ! ^^^^XXX  D    V      U     E  X",
+      "X P   B   _  H ^^^^^^^^^^^^^^ F G  !    T    ! ^^^^XXX  D    V      U     E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1679,7 +1679,7 @@ const LEVELS = [
       "X                                                      X",
       "X                                                      X",
       "X P                                                  E X",
-      "X####                                              ####X",
+      "X####                     F                        ####X",
       "X####                    XXX                       ####X",
       "X####                    XXX                       ####X",
       "X####                    XXX                       ####X",
@@ -1797,7 +1797,7 @@ const LEVELS = [
       "X                                                      X   X",
       "X                                                      D   X",
       "X                                                      D   X",
-      "X P                         K                          D E X",
+      "X P                        FK                          D E X",
       "X####                      XXX                       ######X",
       "X####                      XXX                       ######X",
       "X####                      XXX                       ######X",
@@ -1904,7 +1904,7 @@ const LEVELS = [
       "X            H                  G                  XXX  D                        X",
       "X            H                  G                  XXX  D                        X",
       "X            H                  G                  XXX  D                        X",
-      "X P   B   _  H ^^^^^^^^^^^^^^   G  !    T    ! ^^^^XXX  D    V      V     U   E  X",
+      "X P   B   _  H ^^^^^^^^^^^^^^ F G  !    T    ! ^^^^XXX  D    V      V     U   E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1922,7 +1922,7 @@ const LEVELS = [
       "X                                                        X",
       "X P                                                    E X",
       "X####                                                ####X",
-      "X####                                                ####X",
+      "X####                 F                F             ####X",
       "X####                XXX              XXX            ####X",
       "X####                XXX              XXX            ####X",
       "X####                XXX              XXX            ####X",
@@ -2145,7 +2145,7 @@ const LEVELS = [
       "X            H                  G                  XXX  D   XXXXX                    X",
       "X            H                  G                  XXX  D   XXXXX                    X",
       "X            H                  G                  XXX  D   XXXXX                    X",
-      "X P   B   _  H ^^^^^^^^^^^^^^   G  !    T    ! ^^^^XXX  D   XXXXX     V       U   E  X",
+      "X P   B   _  H ^^^^^^^^^^^^^^ F G  !    T    ! ^^^^XXX  D   XXXXX     V       U   E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2378,7 +2378,7 @@ const LEVELS = [
       "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
       "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
       "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
-      "X P       XXXXXXDWWWWWWWWW           G  !    T    !  B    _  H    V        XXXXXXXXX",
+      "X P       XXXXXXDWWWWWWWWW         F G  !    T    !  B    _  H    V        XXXXXXXXX",
       "XXXXXXXXJXXXXXXXX^^^^^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXX",
     ],
   },
@@ -2613,7 +2613,7 @@ const LEVELS = [
       "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
       "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
       "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
-      "X P       XXXXXXDWWWWWWWW            G  !    T    !  B    _  H^^^^^^^^^   V       XXXXXXXXXX",
+      "X P       XXXXXXDWWWWWWWW          F G  !    T    !  B    _  H^^^^^^^^^   V       XXXXXXXXXX",
       "XXXXXXXXJXXXXXXXX^^^^^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXXX",
     ],
   },
@@ -2821,7 +2821,7 @@ const LEVELS = [
       "X           XXXXXXX     WWWWWWWWWW   G                   D                         XXXXXXXXXXXXX",
       "X           XXXXXXX     WWWWWWWWWW   G                   D                         XXXXXXXXXXXXX",
       "X           XXXXXXX  O  WWWWWWWWWW   G                   D                         XXXXXXXXXXXXX",
-      "X P         XXXXXXX     WWWWWWWWWW   G  !     T     !    D      V         U        XXXXXXXXXXXXX",
+      "X P         XXXXXXX     WWWWWWWWWW F G  !     T     !    D      V         U        XXXXXXXXXXXXX",
       "XXXXXXXXXXJXXXXXXXXXXXXX^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXIIIIIIIIIIIIIIIXXXXXXXJXXXXXXXXXXXXXXX",
     ],
   },
@@ -3074,7 +3074,7 @@ function buildLevel(i) {
   const def = LEVELS[i];
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -3089,6 +3089,7 @@ function buildLevel(i) {
       else if (c === "_") st.plates.push({ tx: x, ty: y, pressed: false });
       else if (c === "E") st.exit = { x: x * TS, y: y * TS, w: TS, h: TS };
       else if (c === "O" || c === "Q") st.portals[c].push({ tx: x, ty: y });
+      else if (c === "F") { st.flags.push({ tx: x, ty: y, on: false }); c = " "; }
       if (c === "D") st.needKey = true;
       row.push(c);
     }
@@ -3547,6 +3548,12 @@ function updateWorld(dt) {
     if (tileAt(tx, ty) === "^" && overlap(p, { x: tx * TS + 4, y: ty * TS + 16, w: TS - 8, h: TS - 16 })) { die("가시에 찔렸다"); return; }
   if (p.y > L.H * TS + 60) { die("추락했다"); return; }
 
+  // checkpoint flags
+  for (const f of L.flags) if (!f.on && overlap(p, { x: f.tx * TS + 6, y: f.ty * TS - 16, w: 20, h: 48 })) {
+    for (const o of L.flags) o.on = false;
+    f.on = true; L.checkpoint = { x: f.tx * TS + (TS - PW) / 2, y: f.ty * TS + TS - PH };
+    sfx.key(); toast("체크포인트"); burst(f.tx * TS + 16, f.ty * TS + 4, 12, "#7fd1c4", 120);
+  }
   // keys
   for (const k of L.keys) if (!k.taken && Math.hypot(p.x + p.w / 2 - k.x, p.y + p.h / 2 - k.y) < 22) {
     k.taken = true; p.keys++; burst(k.x, k.y, 14, "#e8c15a", 150); sfx.key(); toast("열쇠를 얻었다");
@@ -3668,6 +3675,18 @@ function keepAwake(on) {
       navigator.wakeLock.request("screen").then((l) => { wakeLock = l; l.addEventListener("release", () => { wakeLock = null; }); }).catch(() => {});
     } else if (!on && wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   } catch (e) {}
+}
+// Dying after a checkpoint keeps the world (keys, doors, defeated guards) and only moves you back.
+function respawnAtCheckpoint() {
+  const p = L.player, c = L.checkpoint;
+  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true });
+  for (const k of p.scarf) { k.x = p.x + p.w / 2; k.y = p.y + 8; }
+  Object.assign(L.hook, { state: "idle", crate: null });
+  for (const g of L.guards) { g.seeT = 0; g.alert = 0; }
+  jumpQueued = false; touchAim = null;
+  mode = "play";
+  snapCamera();
+  syncTouchUI();
 }
 function restartLevel() { if (L) startLevel(cur, true); }
 function nextLevel() { if (cur + 1 < LEVELS.length) startLevel(cur + 1, false); else showMenu(); }
@@ -4065,6 +4084,20 @@ function drawDynamicTiles(t) {
   }
 }
 
+function drawFlags(t) {
+  for (const f of L.flags) {
+    const px = f.tx * TS, py = f.ty * TS;
+    ctx.fillStyle = "#6b5a3e"; ctx.fillRect(px + 9, py - 14, 3, TS + 14);
+    const wave = Math.sin(t * 5 + f.tx) * 2;
+    ctx.fillStyle = f.on ? "#7fd1c4" : "#9d97a8";
+    ctx.beginPath(); ctx.moveTo(px + 12, py - 14); ctx.lineTo(px + 28, py - 8 + wave); ctx.lineTo(px + 12, py - 1); ctx.fill();
+    if (f.on) {
+      const gl = ctx.createRadialGradient(px + 16, py, 2, px + 16, py, 30);
+      gl.addColorStop(0, "rgba(127,209,196,0.35)"); gl.addColorStop(1, "rgba(127,209,196,0)");
+      ctx.fillStyle = gl; ctx.fillRect(px - 16, py - 30, TS + 32, TS + 40);
+    }
+  }
+}
 function drawKeys(t) {
   for (const k of L.keys) {
     if (k.taken) continue;
@@ -4231,6 +4264,7 @@ function render(t) {
     worldTransform();
     ctx.drawImage(L.layer, 0, 0, L.W * TS, L.H * TS);
     drawDynamicTiles(t);
+    drawFlags(t);
     drawKeys(t);
     drawCrates();
     drawGuards(t);
@@ -4257,7 +4291,7 @@ function step(dt) {
   } else if (mode === "dead") {
     deadT += dt;
     updateCrates(dt);
-    if (deadT > 0.65) restartLevel();
+    if (deadT > 0.65) { if (L.checkpoint) respawnAtCheckpoint(); else restartLevel(); }
   }
   if (L) updateParticles(dt);
 }
