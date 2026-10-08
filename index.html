@@ -224,6 +224,7 @@ const TS = 32, VW = 960, VH = 540;
 const GRAV = 1700, MAXFALL = 900, RUN = 220, ACC_G = 2400, ACC_A = 1200, JUMP = 520;
 const HOOK_SPEED = 1600, HOOK_RANGE = 384, REEL = 280, ROPE_MIN = 22, ROPE_MAX = 420;
 const SWING_ACC = 950, PULL_SPEED = 430;
+const SPRING = 930, WIND_UP = 300, WIND_ACC = 2600;
 const VIS = 210, VIS_HALF = 0.48, SEE_LIMIT = 0.45;
 const PW = 18, PH = 28;
 const STEP = 1 / 120;
@@ -232,6 +233,7 @@ const STEP = 1 / 120;
 // G gate, closed until a switch flips  g gate, open until a switch flips
 // C rotten beam (hookable, breaks soon after the hook bites, regrows)
 // D locked door (key)  H shutter (open while every _ plate is pressed)  E exit
+// J spring pad (solid, launches you upward)  W updraft (rising air, lifts you while inside)
 // P start  K key  B crate  T patrol guard  Y/U static guard facing left/right  V watcher (turns around)  ! patrol turn marker
 const LEVELS = [
   {
@@ -2073,7 +2075,7 @@ const LEVELS = [
   {
     name: "자객의 전설",
     goal: "셔터, 스위치, 열쇠를 모두 풀고 모든 경비를 처치해 전설로 남아라",
-    hint: "마지막 막이다. 상자로 셔터를 열고, 들보로 가시밭을 건너, 벽 스위치로 문을 연다. 순찰병을 처치하고 기둥 위 열쇠로 문을 연 뒤, 단 위 경비와 파수꾼, 마지막 경비를 처치하라.",
+    hint: "상자로 셔터를 열고, 들보로 가시밭을 건너, 벽 스위치로 문을 연다. 순찰병을 처치하고 기둥 위 열쇠로 문을 연 뒤, 단 위 경비와 파수꾼, 마지막 경비를 처치하라.",
     map: [
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
       "X            X                  X                       D                            X",
@@ -2091,6 +2093,239 @@ const LEVELS = [
       "X            H                  G                  XXX  D   XXXXX                    X",
       "X P   B   _  H ^^^^^^^^^^^^^^   G  !    T    ! ^^^^XXX  D   XXXXX     V       U   E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "용수철",
+    goal: "용수철 발판을 밟고 높은 강철 단 위 출구로 올라라",
+    hint: "새 장치: 청록색 용수철 발판을 밟으면 높이 튕겨 오른다. 튕겨 오르는 동안 오른쪽으로 움직여 단 위에 내려앉아라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                  X",
+      "X                                  X",
+      "X                                  X",
+      "X                                  X",
+      "X                             E    X",
+      "X                XXXXXXXXXXXXXXXXXXX",
+      "X                XXXXXXXXXXXXXXXXXXX",
+      "X                XXXXXXXXXXXXXXXXXXX",
+      "X                XXXXXXXXXXXXXXXXXXX",
+      "X                XXXXXXXXXXXXXXXXXXX",
+      "X                XXXXXXXXXXXXXXXXXXX",
+      "X P              XXXXXXXXXXXXXXXXXXX",
+      "XXXXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "상승 기류",
+    goal: "기류를 타고 강철 벽을 넘어 출구로 가라",
+    hint: "새 장치: 희미하게 흐르는 상승 기류 안에 들어가면 몸이 떠오른다. 꼭대기에서 옆으로 빠져나와라. 가시밭 위 기류도 떨어지는 몸을 받쳐 준다.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                      X",
+      "X         WWWW                         X",
+      "X         WWWW    WWWW                 X",
+      "X         WWWWXX  WWWW                 X",
+      "X         WWWWXX  WWWW                 X",
+      "X         WWWWXX  WWWW                 X",
+      "X         WWWWXX  WWWW                 X",
+      "X         WWWWXX  WWWW                 X",
+      "X         WWWWXX  WWWW                 X",
+      "X         WWWWXX  WWWW                 X",
+      "X         WWWWXX  WWWW                 X",
+      "X P       WWWWXX  ^^^^^^          E    X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "튕겨 오르기",
+    goal: "용수철을 이어 밟고 가장 높은 단에 올라라",
+    hint: "바닥의 용수철로 첫 단에 오르고, 그 단 끝의 용수철로 한 번 더 튕겨 올라라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                X",
+      "X                                X",
+      "X                                X",
+      "X                            E   X",
+      "X                  XXXXXXXXXXXXXXX",
+      "X                  XXXXXXXXXXXXXXX",
+      "X                  XXXXXXXXXXXXXXX",
+      "X                  XXXXXXXXXXXXXXX",
+      "X           XXXXXJ XXXXXXXXXXXXXXX",
+      "X           XXXXXX XXXXXXXXXXXXXXX",
+      "X           XXXXXX XXXXXXXXXXXXXXX",
+      "X           XXXXXX XXXXXXXXXXXXXXX",
+      "X           XXXXXX XXXXXXXXXXXXXXX",
+      "X P         XXXXXX^XXXXXXXXXXXXXXX",
+      "XXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "바람 징검다리",
+    goal: "기류 기둥을 차례로 갈아타며 가시밭을 건너라",
+    hint: "기류 꼭대기에서 오른쪽으로 빠져나와 다음 기류에 떨어져라. 기류 안에 들어가면 다시 떠오른다.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                  X",
+      "X    WWW   WWW   WWW   WWW   WWW   WWW   WWW       X",
+      "X    WWW   WWW   WWW   WWW   WWW   WWW   WWW       X",
+      "X    WWW   WWW   WWW   WWW   WWW   WWW   WWW       X",
+      "X    WWW   WWW   WWW   WWW   WWW   WWW   WWW       X",
+      "X    WWW   WWW   WWW   WWW   WWW   WWW   WWW       X",
+      "X P  WWW   WWW   WWW   WWW   WWW   WWW   WWW     E X",
+      "X####WWW   WWW   WWW   WWW   WWW   WWW   WWW   ####X",
+      "X####WWW   WWW   WWW   WWW   WWW   WWW   WWW   ####X",
+      "X####WWW   WWW   WWW   WWW   WWW   WWW   WWW   ####X",
+      "X####WWW   WWW   WWW   WWW   WWW   WWW   WWW   ####X",
+      "X####^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^####X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "하늘에서 온 자객",
+    goal: "용수철로 뛰어올라 단 위 경비를 덮치고, 나머지 경비도 처치하라",
+    hint: "단 위 경비는 왼쪽을 보고 있지만 머리 위는 보지 못한다. 용수철로 높이 튀어 올라 위에서 내려앉아라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                X",
+      "X                                   #####        X",
+      "X                                                X",
+      "X                                                X",
+      "X                                                X",
+      "X                                                X",
+      "X               Y                                X",
+      "X             XXXXX                              X",
+      "X             XXXXX                              X",
+      "X             XXXXX                              X",
+      "X             XXXXX                              X",
+      "X P           XXXXX           U         V     E  X",
+      "XXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "기류 탑",
+    goal: "기류 두 줄기를 갈아타고 탑 꼭대기 출구에 닿아라",
+    hint: "첫 기류 꼭대기에서 오른쪽 들보로 옮기면 두 번째 기류가 다시 띄워 준다. 꼭대기에서 왼쪽 선반으로 빠져나와라.",
+    map: [
+      "XXXXXXXXXXXXXXXX",
+      "X              X",
+      "X              X",
+      "X        WWWW  X",
+      "X  E     WWWW  X",
+      "XXXXXXX  WWWW  X",
+      "X        WWWW  X",
+      "X        WWWW  X",
+      "X        WWWW  X",
+      "X        WWWW  X",
+      "X        WWWW  X",
+      "X        WWWW  X",
+      "X        WWWW  X",
+      "X        WWWW  X",
+      "X   WWWW WWWW  X",
+      "X   WWWW WWWW  X",
+      "X   WWWW ####  X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X   WWWW       X",
+      "X P WWWW       X",
+      "XXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "허공의 열쇠",
+    goal: "기류를 타고 허공의 열쇠를 얻어 문을 열어라",
+    hint: "열쇠는 기류 기둥 꼭대기에 떠 있다. 기류에 몸을 맡기고 올라가 열쇠를 낚아채라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                 D            X",
+      "X       ####                      D            X",
+      "X                   K             D            X",
+      "X                 WWWWW           D            X",
+      "X                 WWWWW           D            X",
+      "X                 WWWWW           D            X",
+      "X                 WWWWW           D            X",
+      "X                 WWWWW           D            X",
+      "X                 WWWWW           D            X",
+      "X                 WWWWW           D            X",
+      "X                 WWWWW           D            X",
+      "X P               WWWWW           D       E    X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "튕김 다리",
+    goal: "가시밭 위 용수철 기둥을 차례로 밟고 건너라",
+    hint: "용수철을 밟으면 저절로 튕겨 오른다. 공중에서 오른쪽으로 움직여 다음 기둥에 내려앉아라. 들보에 후크를 걸어 쉬어 가도 된다.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                      X",
+      "X         ###         ###         ###                  X",
+      "X                                                      X",
+      "X                                                      X",
+      "X                                                      X",
+      "X                                                      X",
+      "X                                                      X",
+      "X                                                      X",
+      "X P                                                E   X",
+      "X####  JJJJ   JJJJ   JJJJ   JJJJ   JJJJ   JJJJ  #######X",
+      "X####  XXXX   XXXX   XXXX   XXXX   XXXX   XXXX  #######X",
+      "X####  XXXX   XXXX   XXXX   XXXX   XXXX   XXXX  #######X",
+      "X####  XXXX   XXXX   XXXX   XXXX   XXXX   XXXX  #######X",
+      "X####^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^#######X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "바람 순찰",
+    goal: "스위치로 문을 열고 순찰병을 처치한 뒤 기류를 타고 높은 출구로 가라",
+    hint: "벽 스위치를 쳐서 주홍 문을 연다. 순찰병을 처치한 뒤 가시밭 위 기류에 몸을 맡기면 높은 단까지 떠오른다.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                 X                                  X",
+      "X     ####        X    ######                        X",
+      "X                 X               WWWWWWWW           X",
+      "X                 S               WWWWWWWW           X",
+      "X                 X               WWWWWWWW      E    X",
+      "X                 X               WWWWWWWWXXXXXXXXXXXX",
+      "X                 X               WWWWWWWWXXXXXXXXXXXX",
+      "X                 X               WWWWWWWWXXXXXXXXXXXX",
+      "X                 G               WWWWWWWWXXXXXXXXXXXX",
+      "X                 G               WWWWWWWWXXXXXXXXXXXX",
+      "X                 G               WWWWWWWWXXXXXXXXXXXX",
+      "X P               G  !    T    ! ^^^^^^^^^XXXXXXXXXXXX",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "바람의 자객",
+    goal: "용수철과 기류, 열쇠, 스위치, 셔터를 모두 넘어 경비를 처치하고 탈출하라",
+    hint: "마지막 막이다. 용수철로 단 위 열쇠를 얻어 문을 열고, 기류와 들보로 가시밭을 건너, 스위치 문과 셔터를 지나라. 마지막 단에는 용수철로 오른다. 막혔으면 <kbd>R</kbd>.",
+    touchHint: "마지막 막이다. 용수철로 단 위 열쇠를 얻어 문을 열고, 기류와 들보로 가시밭을 건너, 스위치 문과 셔터를 지나라. 마지막 단에는 용수철로 오른다. 막혔으면 재시작.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X               X                    X                       X                     X",
+      "X               X                    X                       X                     X",
+      "X               X           #####    X    #######            X ######              X",
+      "X               X WWWWWWWW           X                       X                     X",
+      "X               X WWWWWWWW           S                       X                     X",
+      "X               X WWWWWWWW           X                       X                     X",
+      "X               X WWWWWWWW           X                       X                     X",
+      "X            K  X WWWWWWWW           X                       X               U  E  X",
+      "X         XXXXXXD WWWWWWWW           G                       H             XXXXXXXXX",
+      "X         XXXXXXD WWWWWWWW           G                       H             XXXXXXXXX",
+      "X         XXXXXXD WWWWWWWW           G                       H             XXXXXXXXX",
+      "X         XXXXXXD WWWWWWWW           G                       H             XXXXXXXXX",
+      "X         XXXXXXD WWWWWWWW           G                       H             XXXXXXXXX",
+      "X P       XXXXXXD ^^^^^^^^^^^^^^^^   G  !    T    !  B    _  H    V        XXXXXXXXX",
+      "XXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXX",
     ],
   },
 ];
@@ -2163,6 +2398,7 @@ const sfx = {
   pull: () => tone(300, 0.12, "triangle", 0.04, 520),
   crack: () => { tone(180, 0.15, "sawtooth", 0.05, 60); tone(90, 0.2, "triangle", 0.05); },
   plate: () => tone(260, 0.08, "square", 0.035),
+  spring: () => tone(240, 0.16, "triangle", 0.06, 720),
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, "triangle", 0.06, 0, i * 0.09)),
 };
 
@@ -2339,7 +2575,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -2558,7 +2794,8 @@ function updatePlayer(dt) {
     }
   }
   if (p.ground) p.hookJump = false;
-  if (!keys.Space && p.vy < -260 && !hooked && !p.ground && !p.hookJump) p.vy += GRAV * 0.9 * dt;
+  if (p.vy >= 0) p.boost = false;
+  if (!keys.Space && p.vy < -260 && !hooked && !p.ground && !p.hookJump && !p.boost) p.vy += GRAV * 0.9 * dt;
 
   if (hooked) {
     if (up) h.len = Math.max(ROPE_MIN, h.len - REEL * dt);
@@ -2571,8 +2808,30 @@ function updatePlayer(dt) {
     }
   }
 
+  // updraft: rising air pushes you up while you are inside it
+  let inWind = false;
+  for (let ty = Math.floor(p.y / TS); ty <= Math.floor((p.y + p.h - 1) / TS); ty++)
+    for (let tx = Math.floor(p.x / TS); tx <= Math.floor((p.x + p.w - 1) / TS); tx++)
+      if (tileAt(tx, ty) === "W") inWind = true;
+  // falling bodies are caught hard so a drop into the column is never a straight fall-through
+  if (inWind) { p.vy = approach(p.vy, -WIND_UP, (p.vy > 0 ? WIND_ACC * 3 : WIND_ACC) * dt); p.boost = true; }
+  // with no input the air column holds you in place instead of letting momentum carry you out
+  if (inWind && !ix && !hooked) p.vx = approach(p.vx, 0, 1400 * dt);
+
+  const fallV = p.vy;
   if (moveAxis(p, "x", p.vx * dt)) p.vx = 0;
   if (moveAxis(p, "y", p.vy * dt)) p.vy = 0;
+  // spring pad: landing on top throws you high
+  if (fallV > 0 && p.vy === 0) {
+    const fy = Math.floor((p.y + p.h + 1) / TS);
+    for (let tx = Math.floor((p.x + 2) / TS); tx <= Math.floor((p.x + p.w - 3) / TS); tx++)
+      if (tileAt(tx, fy) === "J") {
+        p.vy = -SPRING; p.boost = true; p.coyote = 0; sfx.spring();
+        L.springT = L.springT || {}; L.springT[tx + "," + fy] = 0.25;
+        burst(p.x + p.w / 2, p.y + p.h, 8, "#7fd1c4", 120);
+        break;
+      }
+  }
 
   if (h.state === "attached") {
     const o = handPos();
@@ -2737,6 +2996,10 @@ function openDoor(tx, ty) {
   sfx.door(); toast("문이 열렸다");
 }
 
+function updateSprings(dt) {
+  if (!L.springT) return;
+  for (const k in L.springT) { L.springT[k] -= dt; if (L.springT[k] <= 0) delete L.springT[k]; }
+}
 function updateCrumble(dt) {
   const h = L.hook;
   for (const k in L.crack) {
@@ -3052,6 +3315,24 @@ function drawDynamicTiles(t) {
       ctx.fillStyle = "#c9a14e"; ctx.beginPath(); ctx.arc(px + 16, py + 14, 5, 0, Math.PI * 2); ctx.fill();
       ctx.fillRect(px + 14, py + 16, 4, 8);
       ctx.fillStyle = "#2a1414"; ctx.fillRect(px + 15, py + 13, 2, 6);
+    } else if (ch === "J") {
+      const k = x + "," + y, sq = L.springT && L.springT[k] > 0 ? L.springT[k] / 0.25 : 0;
+      ctx.fillStyle = "#212839"; ctx.fillRect(px, py + 12, TS, TS - 12);
+      ctx.strokeStyle = "#7fd1c4"; ctx.lineWidth = 2; ctx.beginPath();
+      const top = py + 4 + sq * 6;
+      for (let k2 = 0; k2 < 4; k2++) { ctx.moveTo(px + 6, top + k2 * ((py + 12 - top) / 4)); ctx.lineTo(px + TS - 6, top + (k2 + 0.5) * ((py + 12 - top) / 4)); }
+      ctx.stroke();
+      ctx.fillStyle = "#7fd1c4"; ctx.fillRect(px + 2, top - 3, TS - 4, 4);
+      ctx.fillStyle = "rgba(127,209,196,0.5)"; ctx.fillRect(px + 2, top - 5, TS - 4, 2);
+    } else if (ch === "W") {
+      ctx.fillStyle = "rgba(127,209,196,0.07)"; ctx.fillRect(px, py, TS, TS);
+      ctx.strokeStyle = "rgba(190,240,232,0.35)"; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let k2 = 0; k2 < 3; k2++) {
+        const sx = px + 6 + k2 * 10 + Math.sin(t * 3 + k2 + y) * 2;
+        const sy = py + TS - ((t * 70 + k2 * 13 + hash(x, y) * 32) % TS);
+        ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 9);
+      }
+      ctx.stroke();
     } else if (ch === "_") {
       const pl = L.plates.find((q) => q.tx === x && q.ty === y);
       const down = pl && pl.pressed;
@@ -3262,6 +3543,7 @@ function step(dt) {
     updateCrates(dt);
     updateGuards(dt);
     updateCrumble(dt);
+    updateSprings(dt);
     updateWorld(dt);
   } else if (mode === "dead") {
     deadT += dt;
