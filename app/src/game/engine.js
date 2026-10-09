@@ -29,12 +29,15 @@ const STEP = 1 / 120;
 
 // ---------- save ----------
 const SAVE_KEY = "rope-assassin-v1";
+// Stages whose maps were rebuilt (1-based). Records and ghosts saved on the old maps no longer apply.
+const MAP_REV = 2;
+const REBUILT = [43, 58, 66, 70, 92, 98, 107, 112, 113, 119, 121, 125, 126, 127, 132, 133, 137, 143, 144, 145, 146, 152, 166, 169, 172, 174, 180, 184, 188, 204, 205, 207, 208];
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {} };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1 };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {} };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV };
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
@@ -66,6 +69,17 @@ todaysDaily();
 const GHOST_KEY = "rope-assassin-ghost-v1", GHOST_HZ = 15, GHOST_MAX = 60;
 let ghosts = {};
 try { ghosts = JSON.parse(localStorage.getItem(GHOST_KEY) || "{}") || {}; } catch (e) {}
+if (save.mapRev < MAP_REV) {
+  for (const n of REBUILT) {
+    for (const tbl of [save.best, save.bestH, save.bestM]) delete tbl[n - 1];
+    for (const tbl of [save.sr, save.srH, save.srM])
+      for (const k in tbl) { const [a, b] = k.split("-").map(Number); if (a <= n - 1 && n - 1 <= b) delete tbl[k]; }
+    for (const d of [0, 1, 2]) delete ghosts[d + ":" + (n - 1)];
+  }
+  save.mapRev = MAP_REV;
+  try { localStorage.setItem(GHOST_KEY, JSON.stringify(ghosts)); } catch (e) {}
+  writeSave();
+}
 const ghostId = (i) => diff + ":" + i;
 function storeGhost(i, pts) {
   if (pts.length < 4 || pts.length > GHOST_HZ * 2 * 240) return;
@@ -89,10 +103,10 @@ function applyDifficulty() {
   const sk = skin();
   VIS = [210, 270, 300][diff] * (sk.vis || 1);
   HOOK_RANGE = 384 * (sk.hook || 1); ROPE_MAX = 420 * (sk.hook || 1);
-  SEE_LIMIT = [0.45, 0.2, 0.08][diff];
+  SEE_LIMIT = [0.38, 0.2, 0.08][diff];
   CRACK_T = [1.6, 1.1, 0.75][diff];
   REGROW_T = [4, 6, 8][diff];
-  PATROL_V = [55, 85, 115][diff];
+  PATROL_V = [60, 85, 115][diff];
   WATCH_T = [2.6, 1.6, 1.1][diff];
   const m = daily ? daily.mod : -1;
   GRAV = m === 0 ? 1190 : 1700;
