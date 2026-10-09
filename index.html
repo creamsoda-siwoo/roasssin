@@ -94,6 +94,12 @@
   #bInstall { border-color: var(--teal); color: var(--teal); }
   #bHard.master[aria-pressed="true"] { border-color: #b48cf0; color: #b48cf0; background: rgba(180, 140, 240, 0.12); }
   #masterNote { color: #b48cf0; }
+  .winstars { font-size: 34px; letter-spacing: 6px; line-height: 1; }
+  .winstars i { font-style: normal; color: rgba(236,228,207,.18); }
+  .winstars i.on { color: #ffd47a; text-shadow: 0 0 12px rgba(255,212,122,.6); }
+  .winstarnote { margin: 0; font-size: 13px; color: var(--paper-dim); }
+  .startotal { margin: 0; font-size: 13px; color: #ffd47a; }
+  .lv .best { letter-spacing: -1px; color: #ffd47a; }
   .hardnote ul { margin: 4px 0 0; padding-left: 18px; }
   .hardnote b { font-weight: 600; }
   .hardnote { margin: 0; font-size: 12px; color: var(--vermilion); line-height: 1.6; }
@@ -226,11 +232,13 @@
       <div class="seal" aria-hidden="true">刺<br>客</div>
     </div>
     <p class="lead">밤의 성채에 숨어든 자객. 쇠갈고리 하나로 들보와 벽을 타고, 막마다 다른 장치를 풀어 출구까지 가라.</p>
+    <p class="startotal" id="starTotal"></p>
     <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">난이도 · 일반</button><button id="bInstall" type="button" hidden>앱 설치</button></div>
     <details class="fold" id="settings">
       <summary>설정</summary>
       <div class="row">
         <button id="bSound" type="button">소리 켬</button>
+        <button id="bSkin" type="button">스카프</button>
         <button class="touch-only" id="bBig" type="button" aria-pressed="false">큰 버튼 끔</button>
         <button class="touch-only" id="bLeft" type="button" aria-pressed="false">왼손 모드 끔</button>
         <button class="touch-only" id="bFade" type="button" aria-pressed="false">버튼 투명 끔</button>
@@ -304,6 +312,8 @@
   <div class="panel win">
     <div class="act" id="wAct"></div>
     <h2 id="wTitle">임무 완료</h2>
+    <div class="winstars" id="wStars"></div>
+    <p class="winstarnote" id="wStarNote"></p>
     <div class="winstats">
       <div><span>시간</span><b id="wTime">0.0초</b></div>
       <div><span>사망</span><b id="wDeaths">0</b></div>
@@ -4849,7 +4859,7 @@ const SAVE_KEY = "rope-assassin-v1";
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, left: !!s.left, fade: !!s.fade, vib: s.vib !== false };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false };
   } catch (e) {}
   return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true };
 }
@@ -5808,13 +5818,28 @@ function runStageCleared() {
   syncTouchUI();
   setTimeout(() => $("bNext").focus(), 30);
 }
+// Stars: 1 for clearing, 1 for a deathless run, 1 for beating the target time.
+function parTime(i) {
+  const d = LEVELS[i], rows = d.map, t = rows.join("");
+  const W = Math.max(...rows.map((r) => r.length)), H = rows.length;
+  const count = (re) => (t.match(re) || []).length;
+  return Math.round(8 + Math.max(W, H) * 0.32 + count(/[TYUV]/g) * 2.5 + count(/K/g) * 3 + count(/o/g) * 1.5 + count(/B/g) * 4 + count(/[S]/g) * 2);
+}
+const starsOf = (i, time, deaths) => 1 + (deaths === 0 ? 1 : 0) + (time <= parTime(i) ? 1 : 0);
+function totalStars() {
+  let n = 0;
+  for (const tbl of [save.best, save.bestH, save.bestM]) for (const k in tbl) n += tbl[k].stars || 1;
+  return n;
+}
 function win() {
   mode = "win";
   sfx.win();
   const prev = bestTable()[cur];
-  const rec = { time: runTime, deaths: runDeaths };
+  const stars = starsOf(cur, runTime, runDeaths);
+  const rec = { time: runTime, deaths: runDeaths, stars: Math.max(stars, (prev && prev.stars) || 0) };
   const better = !prev || runTime < prev.time;
-  if (better) bestTable()[cur] = rec;
+  const beforeStars = totalStars();
+  if (better) bestTable()[cur] = rec; else if (prev) prev.stars = rec.stars;
   save.unlocked = Math.max(save.unlocked, Math.min(LEVELS.length, cur + 2));
   writeSave();
   if (run) { runStageCleared(); return; }
@@ -5826,6 +5851,10 @@ function win() {
   $("wTime").textContent = runTime.toFixed(1) + "초";
   $("wDeaths").textContent = runDeaths;
   $("wBest").textContent = (better ? runTime : prev.time).toFixed(1) + "초" + (better && prev ? " ★" : "");
+  $("wStars").innerHTML = [0, 1, 2].map((k) => `<i class="${k < stars ? "on" : ""}">★</i>`).join("");
+  $("wStarNote").textContent = `목표 ${parTime(cur)}초 · ${runDeaths ? "죽지 않고 깨면 별 하나 더" : "무사히 통과"}`;
+  const unlocked = SKINS.filter((sk) => sk.need > beforeStars && sk.need <= totalStars());
+  if (unlocked.length) toast(`새 스카프 · ${unlocked.map((u) => u.name).join(", ")}`);
   $("bNext").innerHTML = last ? "<kbd>Enter</kbd> 메뉴로" : "<kbd>Enter</kbd> 다음 막";
   $("winBox").hidden = false; $("hud").hidden = true;
   syncTouchUI();
@@ -5854,7 +5883,8 @@ function renderLevelList() {
     if (best) b.classList.add("clear");
     b.title = `${i + 1}막 · ${lv.name}` + (locked ? " (잠김)" : best ? ` · 최고 ${best.time.toFixed(1)}초` : "");
     b.setAttribute("aria-label", b.title);
-    b.innerHTML = `<span class="n">${i + 1}</span><span class="best">${best ? best.time.toFixed(1) : locked ? "🔒" : ""}</span>`;
+    const st = best ? best.stars || 1 : 0;
+    b.innerHTML = `<span class="n">${i + 1}</span><span class="best">${best ? "★".repeat(st) + "☆".repeat(3 - st) : locked ? "🔒" : ""}</span>`;
     b.addEventListener("click", () => { ensureAudio(); startLevel(i, false); });
     box.appendChild(b);
   });
@@ -5871,6 +5901,7 @@ function renderLevelList() {
   document.body.classList.toggle("hard", hard);
   document.body.classList.toggle("master", master);
   $("srTitle").textContent = hard ? DIFF_NAME[diff] + " 스피드런" : "스피드런";
+  applySkin();
   const sr = $("srList");
   sr.innerHTML = "";
   SEGMENTS.forEach(([a, b2], idx) => {
@@ -5895,6 +5926,19 @@ function applyBig() {
 }
 applyBig();
 $("bBig").addEventListener("click", () => { save.big = !save.big; writeSave(); applyBig(); });
+function applySkin() {
+  const have = totalStars(), sk = SKINS[save.skin || 0];
+  $("bSkin").textContent = sk.name;
+  $("bSkin").style.color = sk.color === "rainbow" ? "" : sk.color;
+  const next = SKINS.find((s2) => s2.need > have);
+  $("starTotal").textContent = `모은 별 ★ ${have}` + (next ? ` · 다음 스카프(${next.name})까지 ${next.need - have}개` : " · 모든 스카프를 얻었다");
+}
+$("bSkin").addEventListener("click", () => {
+  const have = totalStars();
+  let k = save.skin || 0;
+  do { k = (k + 1) % SKINS.length; } while (SKINS[k].need > have && k !== 0);
+  save.skin = k; writeSave(); applySkin();
+});
 function applyToggles() {
   for (const [id, key, label] of [["bLeft", "left", "왼손 모드"], ["bFade", "fade", "버튼 투명"], ["bVib", "vib", "진동"]]) {
     $(id).textContent = label + (save[key] ? " 켬" : " 끔");
@@ -6359,6 +6403,18 @@ function drawPowers(t) {
     }
   }
 }
+const SKINS = [
+  { name: "붉은 스카프", need: 0, color: "#c8423b" },
+  { name: "청록 스카프", need: 30, color: "#3fa7a0" },
+  { name: "금빛 스카프", need: 90, color: "#e0b04a" },
+  { name: "보랏빛 스카프", need: 180, color: "#a77ae8" },
+  { name: "달빛 스카프", need: 300, color: "#e8e4f0" },
+  { name: "무지개 스카프", need: 450, color: "rainbow" },
+];
+function skinColor(t) {
+  const sk = SKINS[save.skin || 0] || SKINS[0];
+  return sk.color === "rainbow" ? `hsl(${(t * 90) % 360},80%,60%)` : sk.color;
+}
 function drawPlayer(t) {
   if (mode === "dead") return;
   const p = L.player, cx = p.x + p.w / 2;
@@ -6373,7 +6429,7 @@ function drawPlayer(t) {
   });
   ctx.globalAlpha = p.cloak > 0 ? 0.45 : p.invul > 0 && Math.floor(t * 12) % 2 ? 0.4 : 1;
   // scarf
-  ctx.strokeStyle = "#c8423b"; ctx.lineWidth = 3; ctx.lineCap = "round";
+  ctx.strokeStyle = skinColor(t); ctx.lineWidth = 3; ctx.lineCap = "round";
   ctx.beginPath(); ctx.moveTo(p.scarf[0].x, p.scarf[0].y);
   for (const s of p.scarf) ctx.lineTo(s.x, s.y);
   ctx.stroke(); ctx.lineCap = "butt";
@@ -6393,7 +6449,7 @@ function drawPlayer(t) {
   // eye band
   ctx.fillStyle = "#ece4cf"; ctx.fillRect(cx - 2 + p.face * 2, p.y + 4, 6, 2);
   // belt
-  ctx.fillStyle = "#c8423b"; ctx.fillRect(p.x + 1, p.y + 18, p.w - 2, 2);
+  ctx.fillStyle = skinColor(t); ctx.fillRect(p.x + 1, p.y + 18, p.w - 2, 2);
   ctx.globalAlpha = 1;
 }
 
