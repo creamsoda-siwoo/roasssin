@@ -239,6 +239,7 @@
       <div class="row">
         <button id="bSound" type="button">소리 켬</button>
         <button id="bSkin" type="button">스카프</button>
+        <button id="bGhost" type="button" aria-pressed="true">고스트 켬</button>
         <button class="touch-only" id="bBig" type="button" aria-pressed="false">큰 버튼 끔</button>
         <button class="touch-only" id="bLeft" type="button" aria-pressed="false">왼손 모드 끔</button>
         <button class="touch-only" id="bFade" type="button" aria-pressed="false">버튼 투명 끔</button>
@@ -4870,12 +4871,31 @@ const SAVE_KEY = "rope-assassin-v1";
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true };
 }
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 const save = loadSave();
+// Ghosts: your best run of each stage, replayed as a shadow you race against.
+// Positions are sampled 15 times per in-game second and kept in their own key so the save stays small.
+const GHOST_KEY = "rope-assassin-ghost-v1", GHOST_HZ = 15, GHOST_MAX = 60;
+let ghosts = {};
+try { ghosts = JSON.parse(localStorage.getItem(GHOST_KEY) || "{}") || {}; } catch (e) {}
+const ghostId = (i) => diff + ":" + i;
+function storeGhost(i, pts) {
+  if (pts.length < 4 || pts.length > GHOST_HZ * 2 * 240) return;
+  ghosts[ghostId(i)] = { at: Date.now(), d: pts.map((v) => v.toString(36)).join(",") };
+  const ids = Object.keys(ghosts).sort((a, b) => ghosts[b].at - ghosts[a].at);
+  for (const k of ids.slice(GHOST_MAX)) delete ghosts[k];
+  for (let tries = 0; tries < 20; tries++) {
+    try { localStorage.setItem(GHOST_KEY, JSON.stringify(ghosts)); return; } catch (e) {
+      const old = Object.keys(ghosts).sort((a, b) => ghosts[a].at - ghosts[b].at)[0];
+      if (!old || old === ghostId(i)) return; delete ghosts[old];
+    }
+  }
+}
+let ghostRec = [], ghostPlay = null;
 // 0 normal, 1 hard, 2 master. `hard` stays true for master so every hard rule also applies there.
 let diff = save.diff, hard = diff >= 1, master = diff === 2;
 const DIFF_NAME = ["일반", "하드", "마스터"];
@@ -5731,7 +5751,11 @@ function startLevel(i, keepStats) {
   cur = i;
   L = buildLevel(i);
   if (skin().shield) L.player.shield = true;
-  if (!keepStats) { runTime = 0; runDeaths = 0; showCard(); }
+  if (!keepStats) {
+    runTime = 0; runDeaths = 0; showCard(); ghostRec = [];
+    const g = ghosts[ghostId(i)];
+    ghostPlay = g ? g.d.split(",").map((v) => parseInt(v, 36)) : null;
+  }
   mode = "play";
   jumpQueued = false;
   $("menu").hidden = true; $("winBox").hidden = true; $("pauseBox").hidden = true; $("hud").hidden = false;
@@ -5853,7 +5877,7 @@ function win() {
   const rec = { time: runTime, deaths: runDeaths, stars: Math.max(stars, (prev && prev.stars) || 0) };
   const better = !prev || runTime < prev.time;
   const beforeStars = totalStars();
-  if (better) bestTable()[cur] = rec; else if (prev) prev.stars = rec.stars;
+  if (better) { bestTable()[cur] = rec; storeGhost(cur, ghostRec); } else if (prev) prev.stars = rec.stars;
   save.unlocked = Math.max(save.unlocked, Math.min(LEVELS.length, cur + 2));
   writeSave();
   if (run) { runStageCleared(); return; }
@@ -5954,7 +5978,7 @@ $("bSkin").addEventListener("click", () => {
   save.skin = k; writeSave(); applySkin(); applyDifficulty();
 });
 function applyToggles() {
-  for (const [id, key, label] of [["bLeft", "left", "왼손 모드"], ["bFade", "fade", "버튼 투명"], ["bVib", "vib", "진동"]]) {
+  for (const [id, key, label] of [["bLeft", "left", "왼손 모드"], ["bFade", "fade", "버튼 투명"], ["bVib", "vib", "진동"], ["bGhost", "ghost", "고스트"]]) {
     $(id).textContent = label + (save[key] ? " 켬" : " 끔");
     $(id).setAttribute("aria-pressed", String(!!save[key]));
   }
@@ -5962,7 +5986,7 @@ function applyToggles() {
   document.body.classList.toggle("fade", !!save.fade);
 }
 applyToggles();
-for (const [id, key] of [["bLeft", "left"], ["bFade", "fade"], ["bVib", "vib"]])
+for (const [id, key] of [["bLeft", "left"], ["bFade", "fade"], ["bVib", "vib"], ["bGhost", "ghost"]])
   $(id).addEventListener("click", () => { save[key] = !save[key]; writeSave(); applyToggles(); if (key === "vib") buzz(20); });
 $("bHard").addEventListener("click", () => {
   diff = (diff + 1) % 3; hard = diff >= 1; master = diff === 2;
@@ -6459,6 +6483,23 @@ function drawPlayer(t) {
   ctx.globalAlpha = 1;
 }
 
+function drawGhost(t) {
+  if (!save.ghost || !ghostPlay || mode !== "play") return;
+  const n = ghostPlay.length / 2, f = runTime * GHOST_HZ;
+  if (f >= n - 1) return; // the ghost has already reached the exit
+  const k = Math.floor(f), u = f - k;
+  const x = ghostPlay[k * 2] + (ghostPlay[k * 2 + 2] - ghostPlay[k * 2]) * u;
+  const y = ghostPlay[k * 2 + 1] + (ghostPlay[k * 2 + 3] - ghostPlay[k * 2 + 1]) * u;
+  const face = ghostPlay[k * 2 + 2] < ghostPlay[k * 2] ? -1 : 1, cx = x + PW / 2;
+  ctx.globalAlpha = 0.32 + 0.06 * Math.sin(t * 5);
+  ctx.fillStyle = "#9fb4e8";
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x + 1, y + 9, PW - 2, 19, 3) : ctx.rect(x + 1, y + 9, PW - 2, 19); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, y + 6, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#ece4cf"; ctx.fillRect(cx - 2 + face * 2, y + 4, 6, 2);
+  ctx.fillStyle = skinColor(t); ctx.fillRect(x + 1, y + 18, PW - 2, 2);
+  ctx.globalAlpha = 1;
+}
+
 function drawAim() {
   if (mode !== "play") return;
   if (master && !touchMode) return;
@@ -6525,6 +6566,7 @@ function render(t) {
     drawCrates();
     drawGuards(t);
     drawRope();
+    drawGhost(t);
     drawPlayer(t);
     drawParticles();
     drawChase(t);
@@ -6538,6 +6580,7 @@ function step(dt) {
   if (run && !run.done && (mode === "play" || mode === "dead")) run.t += dt;
   if (mode === "play") {
     runTime += dt;
+    while (ghostRec.length / 2 < runTime * GHOST_HZ) ghostRec.push(Math.round(L.player.x), Math.round(L.player.y));
     updatePlayer(dt);
     updateHook(dt);
     updateCrates(dt);
