@@ -272,6 +272,7 @@
       <dt><kbd>점프</kbd></dt><dd>점프 · 매달려 있을 때는 줄을 놓고 도약</dd>
       <dt><kbd>놓기</kbd></dt><dd>줄 놓기</dd>
       <dt><kbd style="color:#b48cf0">▲</kbd> <kbd style="color:#9fe0ff">〰</kbd> <kbd style="color:#ffd47a">◆</kbd></dt><dd>파워업 · 보라 망토는 8초 투명, 하늘색 신발은 12초 2단 점프, 금색 부적은 죽음을 한 번 막아 준다</dd>
+      <dt><kbd style="color:#ffd47a">●</kbd> <kbd style="color:#e65a1e">불길</kbd></dt><dd>맵 형식 · 금화 맵은 금화를 모두 모아야 출구가 열리고, 추격 맵은 왼쪽에서 다가오는 불길에 닿기 전에 출구로 가야 한다</dd>
     </dl>
     <dl class="controls mouse-only">
       <dt><kbd>클릭</kbd></dt><dd>후크 발사 · 나무 들보에만 걸린다 (매달린 채 다시 클릭하면 새로 건다)</dd>
@@ -281,6 +282,7 @@
       <dt><kbd>우클릭</kbd> <kbd>Q</kbd></dt><dd>줄 놓기</dd>
       <dt><kbd>R</kbd> <kbd>M</kbd></dt><dd>재시작 · 소리 켜기/끄기</dd>
       <dt><kbd style="color:#b48cf0">▲</kbd> <kbd style="color:#9fe0ff">〰</kbd> <kbd style="color:#ffd47a">◆</kbd></dt><dd>파워업 · 보라 망토는 8초 투명, 하늘색 신발은 12초 2단 점프, 금색 부적은 죽음을 한 번 막아 준다</dd>
+      <dt><kbd style="color:#ffd47a">●</kbd> <kbd style="color:#e65a1e">불길</kbd></dt><dd>맵 형식 · 금화 맵은 금화를 모두 모아야 출구가 열리고, 추격 맵은 왼쪽에서 다가오는 불길에 닿기 전에 출구로 가야 한다</dd>
     </dl>
     </details>
   </div>
@@ -336,6 +338,8 @@ const STEP = 1 / 120;
 // C rotten beam (hookable, breaks soon after the hook bites, regrows)
 // D locked door (key)  H shutter (open while every _ plate is pressed)  E exit
 // * shadow cloak (guards cannot see you)  + wind boots (double jump)  $ guardian charm (survive one hit)
+// o gold coin (exit stays shut until every coin is taken)
+// level.chase = px/s: a wall of fire sweeps in from the left
 // F checkpoint flag (touch it and you respawn there)  O / Q teleport doors (two of each letter, linked)  I ice floor (solid, slippery)
 // J spring pad (solid, launches you upward)  W updraft (rising air, lifts you while inside)
 // P start  K key  B crate  T patrol guard  Y/U static guard facing left/right  V watcher (turns around)  ! patrol turn marker
@@ -4602,8 +4606,8 @@ const LEVELS = [
     name: "백아흔 번째 밤",
     needsPower: true,
     goal: "문, 용수철, 열쇠, 기류, 신발, 망토, 얼음, 셔터를 모두 넘어 성채를 떠나라",
-    hint: "마지막 막이다. 문으로 벽을 넘고 용수철로 열쇠를 얻어 문을 연다. 기류로 가시밭을 건너 신발로 담을 넘고, 망토로 정면 경비를 처치한다. 얼음 위 경비를 덮친 뒤 상자로 셔터를 열어라. 막혔으면 <kbd>R</kbd>.",
-    touchHint: "마지막 막이다. 문으로 벽을 넘고 용수철로 열쇠를 얻어 문을 연다. 기류로 가시밭을 건너 신발로 담을 넘고, 망토로 정면 경비를 처치한다. 얼음 위 경비를 덮친 뒤 상자로 셔터를 열어라. 막혔으면 재시작.",
+    hint: "문으로 벽을 넘고 용수철로 열쇠를 얻어 문을 연다. 기류로 가시밭을 건너 신발로 담을 넘고, 망토로 정면 경비를 처치한다. 얼음 위 경비를 덮친 뒤 상자로 셔터를 열어라. 막혔으면 <kbd>R</kbd>.",
+    touchHint: "문으로 벽을 넘고 용수철로 열쇠를 얻어 문을 연다. 기류로 가시밭을 건너 신발로 담을 넘고, 망토로 정면 경비를 처치한다. 얼음 위 경비를 덮친 뒤 상자로 셔터를 열어라. 막혔으면 재시작.",
     map: [
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
       "X         X                   D                                                                      X           X",
@@ -4621,6 +4625,220 @@ const LEVELS = [
       "X         X  O      XXXXXX    DWWWWWWWWWWWW          XX                                              H           X",
       "X P   O   X         XXXXXX F  DWWWWWWWWWWWW  F +     XX   *      Y     Y   F        U        B      _H      E    X",
       "XXXXXXXXXXXXXXXXXXJXXXXXXXXXXXX^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXIIIIIIIIIIIIIXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "불길 도주",
+    chase: 120,
+    goal: "뒤쫓아 오는 불길보다 빨리 출구까지 달려라",
+    hint: "새 맵 형식: 왼쪽에서 불길이 쫓아온다. 멈추지 말고 달려라. 가시는 뛰어넘고 낮은 단은 뛰어올라라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                     XXX                 XXX                 XXX              X",
+      "X  P          ^^      XXX     ^^          XXX       ^^        XXX          E   X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "금화 줍기",
+    goal: "금화 여섯 개를 모두 모아 출구를 열어라",
+    hint: "새 맵 형식: 금화를 모두 모아야 출구가 열린다. 하나는 들보 아래 허공에 떠 있다. 후크로 매달려 낚아채라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                            X",
+      "X                                            X",
+      "X                     #####                  X",
+      "X                                            X",
+      "X                      o                     X",
+      "X                                            X",
+      "X                                            X",
+      "X                                            X",
+      "X            o            o                  X",
+      "X           XXXX         XXXX                X",
+      "X P     o   XXXX    o    XXXX    o        E  X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "불길과 용수철",
+    chase: 110,
+    goal: "용수철로 단을 넘으며 불길보다 먼저 출구에 닿아라",
+    hint: "용수철로 단에 오른 뒤 그대로 반대편으로 뛰어내려라. 멈추면 불길에 잡힌다.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                                                  X",
+      "X                                                                                  X",
+      "X                                                                                  X",
+      "X                                                                                  X",
+      "X                                                                                  X",
+      "X                                                                                  X",
+      "X                                                                                  X",
+      "X                                                                             E    X",
+      "X               XXXXXXXXX           XXXXXXXXX                     XXXXXXXXXXXXXXXXXX",
+      "X               XXXXXXXXX           XXXXXXXXX                     XXXXXXXXXXXXXXXXXX",
+      "X               XXXXXXXXX           XXXXXXXXX                     XXXXXXXXXXXXXXXXXX",
+      "X               XXXXXXXXX           XXXXXXXXX                     XXXXXXXXXXXXXXXXXX",
+      "X               XXXXXXXXX           XXXXXXXXX           XXX       XXXXXXXXXXXXXXXXXX",
+      "X  P            XXXXXXXXX           XXXXXXXXX      ^^   XXX       XXXXXXXXXXXXXXXXXX",
+      "XXXXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "금화 금고",
+    goal: "금고 안의 금화까지 모두 모아 출구를 열어라",
+    hint: "보랏빛 문은 금고 안으로, 분홍 문은 바깥으로 이어진다. 금화 다섯 개를 모두 챙겨라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                X",
+      "X                                                X",
+      "X                                                X",
+      "X                                                X",
+      "X                                                X",
+      "X                 XXXXXXXXXXXXX                  X",
+      "X                 X           X                  X",
+      "X                 X           X                  X",
+      "X                 X           X                  X",
+      "X                 X           X                  X",
+      "X                 XO          X    Q             X",
+      "X P   o  O        X   o  o   QX         o     E  X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "얼음 위 도주",
+    chase: 120,
+    goal: "얼음 위에서 불길을 피해 출구까지 달려라",
+    hint: "얼음 위에서는 멈추기 어렵지만 빨리 달릴 수 있다. 가시와 낮은 단을 뛰어넘어라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                                                                              X",
+      "X                        XX                                 XX                 X",
+      "X  P            ^^       XX       ^^              ^^        XX              E  X",
+      "XXXXXXIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIXXXXXXX",
+    ],
+  },
+  {
+    name: "바람 속 금화",
+    goal: "기류 꼭대기와 바닥의 금화를 모두 모아라",
+    hint: "기류 안에서 방향키를 놓으면 떠오른다. 금화는 기둥 오른쪽 위에 있다.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                    X",
+      "X                                                    X",
+      "X           o           o           o                X",
+      "X       WWWWW       WWWWW       WWWWW                X",
+      "X       WWWWW       WWWWW       WWWWW                X",
+      "X       WWWWW       WWWWW       WWWWW                X",
+      "X       WWWWW       WWWWW       WWWWW                X",
+      "X       WWWWW       WWWWW       WWWWW                X",
+      "X       WWWWW       WWWWW       WWWWW                X",
+      "X       WWWWW       WWWWW       WWWWW                X",
+      "X       WWWWW       WWWWW       WWWWW                X",
+      "X P     WWWWW     o WWWWW     o WWWWW           E    X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "망토 도주",
+    needsPower: true,
+    chase: 110,
+    goal: "불길에 쫓기며 망토로 정면 경비 넷을 처치하라",
+    hint: "망토를 쓰고 멈추지 말고 달려라. 경비에 닿기만 해도 처치된다.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                                          X",
+      "X                                                                          X",
+      "X                                                                          X",
+      "X                                                                          X",
+      "X                                                                          X",
+      "X                                                                          X",
+      "X                                                                          X",
+      "X                                                                          X",
+      "X                                                      XX                  X",
+      "X  P  *           Y    ^^   Y         Y         Y      XX              E   X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "금화와 경비",
+    goal: "금화 넷을 모으고 경비 둘을 처치하라",
+    hint: "단 위 금화는 상자를 딛고 뛰어서 얻는다. 경비들은 등을 보이고 있다. 막혔으면 <kbd>R</kbd>.",
+    touchHint: "단 위 금화는 상자를 딛고 뛰어서 얻는다. 경비들은 등을 보이고 있다. 막혔으면 재시작.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                    X",
+      "X                                                    X",
+      "X             ######                                 X",
+      "X                                                    X",
+      "X                                                    X",
+      "X                                                    X",
+      "X                o                                   X",
+      "X               XXXX                                 X",
+      "X               XXXX                                 X",
+      "X P     B       XXXX    o     U     o     U   o   E  X",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "불길 위 바람",
+    chase: 100,
+    goal: "기류로 가시밭을 건너며 불길을 피해 달려라",
+    hint: "기류 안에서는 떨어지지 않는다. 오른쪽으로 계속 밀며 건너라.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                                                  X",
+      "X                                                                                  X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW               WWWWWWWWWWWWW                              X",
+      "X           WWWWWWWWWWWWW       XX      WWWWWWWWWWWWW                              X",
+      "X  P        WWWWWWWWWWWWW       XX      WWWWWWWWWWWWW       ^^                E    X",
+      "XXXXXXXXXXXX^^^^^^^^^^^^^XXXXXXXXXXXXXXX^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    ],
+  },
+  {
+    name: "이백 번째 밤",
+    chase: 95,
+    goal: "불길에 쫓기며 금화 일곱 개를 모두 모아 탈출하라",
+    hint: "마지막 막이다. 불길이 쫓아오는 동안 금화를 모두 모아야 한다. 용수철과 기류로 높이 오르고, 얼음 위 경비를 덮쳐라. 금화 하나라도 놓치면 출구가 열리지 않는다.",
+    map: [
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X                                                                                                            X",
+      "X                                                                                                            X",
+      "X                                                o                                                           X",
+      "X                                    WWWWWWWWWWWWW                                                           X",
+      "X                                    WWWWWWWWWWWWW                                                           X",
+      "X                                    WWWWWWWWWWWWW                                                           X",
+      "X                                    WWWWWWWWWWWWW                                                           X",
+      "X                               o    WWWWWWWWWWWWW                                                o     E    X",
+      "X                           XXXXXXXXXWWWWWWWWWWWWW                                            XXXXXXXXXXXXXXXX",
+      "X                           XXXXXXXXXWWWWWWWWWWWWW                                            XXXXXXXXXXXXXXXX",
+      "X                           XXXXXXXXXWWWWWWWWWWWWW                                            XXXXXXXXXXXXXXXX",
+      "X                           XXXXXXXXXWWWWWWWWWWWWW                                            XXXXXXXXXXXXXXXX",
+      "X                           XXXXXXXXXWWWWWWWWWWWWW                        XX                  XXXXXXXXXXXXXXXX",
+      "X  P     o    ^^    o       XXXXXXXXXWWWWWWWWWWWWW        U     o         XX    o     U       XXXXXXXXXXXXXXXX",
+      "XXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXX^^^^^^^^^^^^^XXIIIIIIIIIIIIIIIIIIIXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXXXXXXXXX",
     ],
   },
 ];
@@ -4883,7 +5101,7 @@ function buildLevel(i) {
   const def = LEVELS[i];
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -4898,6 +5116,7 @@ function buildLevel(i) {
       else if (c === "_") st.plates.push({ tx: x, ty: y, pressed: false });
       else if (c === "E") st.exit = { x: x * TS, y: y * TS, w: TS, h: TS };
       else if (c === "O" || c === "Q") st.portals[c].push({ tx: x, ty: y });
+      else if (c === "o") { st.coins.push({ x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
       else if (c === "F") { if (!hard) st.flags.push({ tx: x, ty: y, on: false }); c = " "; }
       else if ((c === "*" || c === "+" || c === "$") && hard && !def.needsPower) c = " ";
       else if (c === "*" || c === "+" || c === "$") { st.powers.push({ kind: c, x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
@@ -4906,6 +5125,7 @@ function buildLevel(i) {
     }
     st.grid.push(row);
   }
+  if (def.chase) st.chase = { x: st.start.x - 200, v: def.chase * [1, 1.15, 1.3][diff] };
   st.player = { cloak: 0, boots: 0, airJump: false, shield: false, invul: 0, x: st.start.x, y: st.start.y, w: PW, h: PH, vx: 0, vy: 0, ground: false, coyote: 0, jbuf: 0, face: 1, keys: 0, run: 0, scarf: [] };
   for (let k = 0; k < 8; k++) st.player.scarf.push({ x: st.start.x + PW / 2, y: st.start.y + 8 });
   st.hook = { state: "idle", x: 0, y: 0, dx: 0, dy: 0, dist: 0, ax: 0, ay: 0, len: 0, crate: null };
@@ -5377,6 +5597,19 @@ function updateWorld(dt) {
     if (tileAt(tx, ty) === "^" && overlap(p, { x: tx * TS + 4, y: ty * TS + 16, w: TS - 8, h: TS - 16 })) { die("가시에 찔렸다"); return; }
   if (p.y > L.H * TS + 60) { die("추락했다"); return; }
 
+  // coins
+  for (const c of L.coins) if (!c.taken && Math.hypot(p.x + p.w / 2 - c.x, p.y + p.h / 2 - c.y) < 22) {
+    c.taken = true; sfx.plate(); burst(c.x, c.y, 10, "#ffd47a", 120);
+    const left = L.coins.filter((q) => !q.taken).length;
+    toast(left ? `금화 ${L.coins.length - left}/${L.coins.length}` : "금화를 모두 모았다 · 출구가 열렸다");
+  }
+  // chasing fire
+  if (L.chase) {
+    const ch = L.chase;
+    // never fall too far behind the player, so idling is never safe
+    ch.x = Math.max(ch.x + ch.v * dt, p.x - 360);
+    if (p.x + 4 < ch.x) { die("불길에 휩싸였다"); return; }
+  }
   // power-ups
   for (const pw of L.powers) if (!pw.taken && Math.hypot(p.x + p.w / 2 - pw.x, p.y + p.h / 2 - pw.y) < 24) {
     pw.taken = true; sfx.key(); buzz(15);
@@ -5406,8 +5639,11 @@ function updateWorld(dt) {
   // exit
   L.msgCool -= dt;
   if (L.exit && overlap(p, L.exit)) {
+    const coinsLeft = L.coins.filter((c) => !c.taken).length;
     if (L.guards.some((g) => g.alive)) {
       if (L.msgCool <= 0) { toast("아직 경비가 남아 있다", true); L.msgCool = 2; }
+    } else if (coinsLeft) {
+      if (L.msgCool <= 0) { toast(`금화가 ${coinsLeft}개 남았다`, true); L.msgCool = 2; }
     } else win();
   }
 }
@@ -5527,6 +5763,7 @@ function respawnAtCheckpoint() {
   const p = L.player, c = L.checkpoint;
   Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: false, invul: 0 });
   for (const pw of L.powers) pw.taken = false;
+  if (L.chase) L.chase.x = c.x - 200;
   for (const k of p.scarf) { k.x = p.x + p.w / 2; k.y = p.y + 8; }
   Object.assign(L.hook, { state: "idle", crate: null });
   for (const g of L.guards) { g.seeT = 0; g.alert = 0; }
@@ -5727,6 +5964,8 @@ function updateHUD() {
   if (run) $("hRun").textContent = run.t.toFixed(1);
   $("hDeaths").textContent = runDeaths;
   const chips = [];
+  if (L.coins.length) { const got = L.coins.filter((c) => c.taken).length; chips.push([`금화 ${got}/${L.coins.length}`, got === L.coins.length]); }
+  if (L.chase) chips.push(["불길 추격", false]);
   if (L.needKey) {
     const total = L.keys.length, got = L.keys.filter((k) => k.taken).length;
     const doorsLeft = L.grid.some((r) => r.includes("D"));
@@ -5960,7 +6199,7 @@ function drawDynamicTiles(t) {
       ctx.fillRect(px + 3, py + TS - (down ? 3 : 6), TS - 6, down ? 3 : 6);
       if (down) { ctx.fillStyle = "rgba(220,165,74,0.25)"; ctx.fillRect(px - 2, py + TS - 12, TS + 4, 12); }
     } else if (ch === "E") {
-      const open = !L.guards.some((g) => g.alive);
+      const open = !L.guards.some((g) => g.alive) && !L.coins.some((c) => !c.taken);
       if (open) {
         const gl = ctx.createRadialGradient(px + 16, py + 16, 4, px + 16, py + 16, 60);
         gl.addColorStop(0, "rgba(255,210,140,0.45)"); gl.addColorStop(1, "rgba(255,210,140,0)");
@@ -5977,6 +6216,27 @@ function drawDynamicTiles(t) {
   }
 }
 
+function drawCoins(t) {
+  for (const c of L.coins) {
+    if (c.taken) continue;
+    const w = Math.abs(Math.cos(t * 3 + c.x * 0.1)) * 7 + 1.5, y = c.y + Math.sin(t * 2.5 + c.x) * 2;
+    ctx.fillStyle = "rgba(255,212,122,0.25)"; ctx.beginPath(); ctx.arc(c.x, y, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#e8b84a"; ctx.beginPath(); ctx.ellipse(c.x, y, w, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff0c2"; ctx.fillRect(c.x - 0.75, y - 4, 1.5, 8);
+  }
+}
+function drawChase(t) {
+  if (!L.chase) return;
+  const x = L.chase.x, top = cam.y - 20, bot = cam.y + viewH + 20;
+  const g = ctx.createLinearGradient(x - 160, 0, x + 24, 0);
+  g.addColorStop(0, "rgba(160,30,10,0.92)"); g.addColorStop(0.75, "rgba(230,90,30,0.75)"); g.addColorStop(1, "rgba(255,170,60,0)");
+  ctx.fillStyle = g; ctx.fillRect(Math.max(cam.x - 20, x - 2000), top, x + 24 - Math.max(cam.x - 20, x - 2000), bot - top);
+  ctx.fillStyle = "rgba(255,200,90,0.85)";
+  for (let yy = Math.floor(top / 18) * 18; yy < bot; yy += 18) {
+    const f = Math.sin(t * 9 + yy * 0.3) * 8 + Math.sin(t * 5.3 + yy) * 5;
+    ctx.beginPath(); ctx.moveTo(x - 6, yy); ctx.quadraticCurveTo(x + 14 + f, yy + 9, x - 6, yy + 18); ctx.fill();
+  }
+}
 function drawFlags(t) {
   for (const f of L.flags) {
     const px = f.tx * TS, py = f.ty * TS;
@@ -6197,6 +6457,7 @@ function render(t) {
     ctx.drawImage(L.layer, 0, 0, L.W * TS, L.H * TS);
     drawDynamicTiles(t);
     drawFlags(t);
+    drawCoins(t);
     drawPowers(t);
     drawKeys(t);
     drawCrates();
@@ -6204,6 +6465,7 @@ function render(t) {
     drawRope();
     drawPlayer(t);
     drawParticles();
+    drawChase(t);
     drawAim();
   }
   drawVignette();
