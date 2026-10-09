@@ -175,3 +175,11 @@ body.touch .hud-l { max-width: calc(100vw - 340px - env(safe-area-inset-left, 0p
   .lv { min-height: 44px; padding: 6px 2px 4px; }
 }
 @media (prefers-reduced-motion: reduce) { #toast, #card { transition: none; } }
+.achgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.ach { display: grid; gap: 4px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.ach b { font-weight: 600; font-size: 14px; }
+.ach small { font-size: 11px; color: var(--paper-dim); font-variant-numeric: tabular-nums; }
+.ach.done { border-color: rgba(255, 212, 122, .55); }
+.ach.done b { color: #ffd47a; }
+.ach .bar { height: 3px; border-radius: 2px; background: rgba(236, 228, 207, .12); overflow: hidden; }
+.ach .bar i { display: block; height: 100%; background: var(--rope); }

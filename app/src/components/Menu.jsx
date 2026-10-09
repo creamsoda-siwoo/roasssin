@@ -95,6 +95,18 @@ export default function Menu({ info, shown, touch, muted, install }) {
           </div>
         </details>
         <details className="fold">
+          <summary>업적 {info.achievements.filter((a) => a.done).length}/{info.achievements.length}</summary>
+          <div className="achgrid" id="achList">
+            {info.achievements.map((a) => (
+              <div key={a.id} className={"ach" + (a.done ? " done" : "")}>
+                <b>{a.done ? "✓ " : ""}{a.name}</b>
+                <small>{a.desc}{a.prog && !a.done ? ` · ${a.prog}` : ""}</small>
+                {!a.done && <div className="bar"><i style={{ width: a.pct + "%" }} /></div>}
+              </div>
+            ))}
+          </div>
+        </details>
+        <details className="fold">
           <summary>조작법</summary>
           <dl className="controls touch-only">
             <dt><kbd>화면 누르기</kbd></dt><dd>누른 채로 조준하고, 떼면 후크 발사 · 가까운 들보에 자동으로 맞춰 준다</dd>

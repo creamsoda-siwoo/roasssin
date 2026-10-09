@@ -32,9 +32,9 @@ const SAVE_KEY = "rope-assassin-v1";
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "" };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {} };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {} };
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
@@ -54,7 +54,7 @@ function todaysDaily() {
   const today = dayKey();
   if (!save.daily || save.daily.date !== today) {
     let h = 2166136261; for (const c of today) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
-    const pool = Math.max(5, Math.min(200, save.unlocked));
+    const pool = Math.max(5, Math.min(LEVELS.length, save.unlocked));
     save.daily = { date: today, lvl: h % pool, mod: (h >>> 8) % DAILY_MODS.length, best: null };
     writeSave();
   }
@@ -487,6 +487,7 @@ function onHookHit(hit) {
     h.ax = ax; h.ay = ay; h.state = "attached"; h.tx = hit.tx; h.ty = hit.ty;
     if (tileAt(hit.tx, hit.ty) === "C") { const k = hit.tx + "," + hit.ty; if (!(k in L.crack)) L.crack[k] = CRACK_T; }
     h.len = clamp(Math.hypot(o.x - ax, o.y - ay), ROPE_MIN, ROPE_MAX);
+    bump("hooks");
     burst(ax, ay, 5, "#e8c88a", 90);
     sfx.attach();
   } else if (hit.kind === "switch") {
@@ -701,7 +702,7 @@ function updateGuards(dt) {
 
 function killGuard(g) {
   if (!g.alive) return;
-  g.alive = false; g.deadT = 0;
+  g.alive = false; g.deadT = 0; bump("kills");
   burst(g.x + g.w / 2, g.y + 10, 18, "#8f2a2a", 220);
   burst(g.x + g.w / 2, g.y + 10, 8, "#e9e3d3", 160);
   sfx.kill();
@@ -727,6 +728,7 @@ function die(reason) {
     return;
   }
   setMode("dead"); deadT = 0; runDeaths++; if (run) run.deaths++;
+  bump("deaths"); save.stats.clean = 0; writeSave();
   const p = L.player;
   burst(p.x + p.w / 2, p.y + p.h / 2, 26, "#0d0d12", 260);
   burst(p.x + p.w / 2, p.y + p.h / 2, 10, "#c8423b", 200);
@@ -759,7 +761,7 @@ function updateWorld(dt) {
 
   // coins
   for (const c of L.coins) if (!c.taken && Math.hypot(p.x + p.w / 2 - c.x, p.y + p.h / 2 - c.y) < 22 + (skin().magnet || 0)) {
-    c.taken = true; sfx.plate(); burst(c.x, c.y, 10, "#ffd47a", 120);
+    c.taken = true; bump("coins"); sfx.plate(); burst(c.x, c.y, 10, "#ffd47a", 120);
     const left = L.coins.filter((q) => !q.taken).length;
     toast(left ? `금화 ${L.coins.length - left}/${L.coins.length}` : "금화를 모두 모았다 · 출구가 열렸다");
   }
@@ -1001,9 +1003,38 @@ function totalStars() {
   for (const tbl of [save.best, save.bestH, save.bestM]) for (const k in tbl) n += tbl[k].stars || 1;
   return n;
 }
+// Achievements: lifetime goals checked after each clear; each records when it was earned.
+const bump = (k) => { save.stats[k] = (save.stats[k] || 0) + 1; };
+const clears = (tbl) => Object.keys(tbl).length;
+const ACHIEVEMENTS = [
+  { id: "first", name: "첫 임무", desc: "아무 막이나 처음으로 깬다", goal: 1, val: () => clears(save.best) + clears(save.bestH) + clears(save.bestM) },
+  { id: "c50", name: "숙련 자객", desc: "일반 모드에서 막 50개를 깬다", goal: 50, val: () => clears(save.best) },
+  { id: "call", name: "성채 정복", desc: `일반 모드에서 막 ${LEVELS.length}개를 모두 깬다`, goal: LEVELS.length, val: () => clears(save.best) },
+  { id: "h50", name: "붉은 밤", desc: "하드 모드에서 막 50개를 깬다", goal: 50, val: () => clears(save.bestH) },
+  { id: "m10", name: "등불 하나", desc: "마스터 모드에서 막 10개를 깬다", goal: 10, val: () => clears(save.bestM) },
+  { id: "s300", name: "별 수집가", desc: "별 300개를 모은다", goal: 300, val: () => totalStars() },
+  { id: "k100", name: "그림자 사냥꾼", desc: "경비 100명을 처치한다", goal: 100, val: () => save.stats.kills || 0 },
+  { id: "k500", name: "전설의 자객", desc: "경비 500명을 처치한다", goal: 500, val: () => save.stats.kills || 0 },
+  { id: "o200", name: "금화 수집가", desc: "금화 200개를 줍는다", goal: 200, val: () => save.stats.coins || 0 },
+  { id: "hk1000", name: "갈고리 장인", desc: "후크를 1000번 건다", goal: 1000, val: () => save.stats.hooks || 0 },
+  { id: "clean10", name: "흠 없는 칼날", desc: "죽지 않고 막 10개를 연달아 깬다", goal: 10, val: () => save.stats.cleanBest || 0 },
+  { id: "d7", name: "꾸준한 수행", desc: "오늘의 도전을 7일 연속으로 깬다", goal: 7, val: () => save.streak || 0 },
+  { id: "sr", name: "질주 본능", desc: "스피드런 구간 하나를 끝까지 달린다", goal: 1, val: () => clears(save.sr) + clears(save.srH) + clears(save.srM) },
+  { id: "dd100", name: "끈질긴 자객", desc: "100번 쓰러지고도 다시 일어선다", goal: 100, val: () => save.stats.deaths || 0 },
+];
+function checkAchievements() {
+  const fresh = ACHIEVEMENTS.filter((a) => !save.ach[a.id] && a.val() >= a.goal);
+  if (!fresh.length) return;
+  for (const a of fresh) save.ach[a.id] = Date.now();
+  writeSave();
+  sfx.key();
+  toast(fresh.length > 3 ? `업적 ${fresh.length}개 달성` : `업적 달성 · ${fresh.map((a) => a.name).join(", ")}`);
+}
 function win() {
   setMode("win");
   sfx.win();
+  if (runDeaths === 0) { bump("clean"); save.stats.cleanBest = Math.max(save.stats.cleanBest || 0, save.stats.clean); }
+  setTimeout(checkAchievements, 1400); // after the stage's own toasts
   if (daily) { dailyCleared(); return; }
   const prev = bestTable()[cur];
   const stars = starsOf(cur, runTime, runDeaths);
@@ -1032,7 +1063,9 @@ export function showMenu() {
   if (daily) { daily = null; applyDifficulty(); }
   keepAwake(false);
   todaysDaily();
-  setState({ overlay: "menu", hudShown: false, rev: getState().rev + 1 });
+  checkAchievements();
+  setState({ overlay: "menu", hudShown: false });
+  writeSave();
 }
 
 // ---------- menu data and actions (read by the React UI) ----------
@@ -1053,6 +1086,10 @@ export function menuInfo() {
     levels: LEVELS.map((lv, i) => {
       const locked = i >= save.unlocked, best = bestTable()[i];
       return { i, name: lv.name, locked, best: best ? best.time : null, stars: best ? best.stars || 1 : 0 };
+    }),
+    achievements: ACHIEVEMENTS.map((a) => {
+      const v = Math.min(a.val(), a.goal);
+      return { id: a.id, name: a.name, desc: a.desc, done: !!save.ach[a.id], pct: Math.round((v / a.goal) * 100), prog: a.goal > 1 ? `${v}/${a.goal}` : "" };
     }),
     segments: SEGMENTS.map(([a, b], idx) => {
       const locked = b >= save.unlocked, best = srTable()[segKey(a, b)];
