@@ -87,9 +87,13 @@
   .srb.all { grid-column: 1 / -1; border-color: var(--rope); }
   .srb.all b { color: var(--rope); }
   .stat.run b { color: var(--rope); }
+  #bHard.master, body.master .act.hardtag, body.master .lv .n, body.master .fold summary { border-color: #b48cf0; color: #b48cf0; }
+  .act.mastertag { color: #b48cf0 !important; }
   #bHard[aria-pressed="true"] { border-color: var(--vermilion); color: var(--vermilion); background: rgba(208, 88, 63, 0.12); }
   .installnote { color: var(--teal) !important; }
   #bInstall { border-color: var(--teal); color: var(--teal); }
+  #bHard.master[aria-pressed="true"] { border-color: #b48cf0; color: #b48cf0; background: rgba(180, 140, 240, 0.12); }
+  #masterNote { color: #b48cf0; }
   .hardnote ul { margin: 4px 0 0; padding-left: 18px; }
   .hardnote b { font-weight: 600; }
   .hardnote { margin: 0; font-size: 12px; color: var(--vermilion); line-height: 1.6; }
@@ -222,7 +226,7 @@
       <div class="seal" aria-hidden="true">刺<br>客</div>
     </div>
     <p class="lead">밤의 성채에 숨어든 자객. 쇠갈고리 하나로 들보와 벽을 타고, 막마다 다른 장치를 풀어 출구까지 가라.</p>
-    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">하드 모드 끔</button><button id="bInstall" type="button" hidden>앱 설치</button></div>
+    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">난이도 · 일반</button><button id="bInstall" type="button" hidden>앱 설치</button></div>
     <details class="fold" id="settings">
       <summary>설정</summary>
       <div class="row">
@@ -236,6 +240,14 @@
     </details>
     <p class="hardnote installnote" id="installNote" hidden></p>
     <div class="hardnote" id="hardNote" hidden>
+      <div id="masterNote" hidden><b>마스터 모드: 하드 모드의 모든 규칙에 더해</b>
+      <ul>
+        <li>등불 하나만 든 어둠 · 내 주변만 보인다</li>
+        <li>경비가 거의 즉시 알아채고 더 멀리 본다 · 순찰이 훨씬 빠르다</li>
+        <li>금 간 들보가 순식간에 무너진다</li>
+        <li>조준선이 보이지 않는다 (PC)</li>
+        <li>기록은 따로 남는다</li>
+      </ul></div>
       <b>하드 모드에서 달라지는 것</b>
       <ul>
         <li>체크포인트 깃발이 없다 · 죽으면 막 처음부터</li>
@@ -2406,17 +2418,17 @@ const LEVELS = [
       "X               X                    X                       X                     X",
       "X               X                    X                       X                     X",
       "X               X           #####    X    #######            X ######              X",
-      "X               XWWWWWWWWW           X                       X                     X",
-      "X               XWWWWWWWWW           S                       X                     X",
-      "X               XWWWWWWWWW           X                       X                     X",
-      "X               XWWWWWWWWW           X                       X                     X",
-      "X            K  XWWWWWWWWW           X                       X               U  E  X",
-      "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
-      "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
-      "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
-      "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
-      "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
-      "X P      *XXXXXXDWWWWWWWWW         F G  !    T    !  B    _  H    V        XXXXXXXXX",
+      "X               XWWWWWWWWWWWWWWWWW   X                       X                     X",
+      "X               XWWWWWWWWWWWWWWWWW   S                       X                     X",
+      "X               XWWWWWWWWWWWWWWWWW   X                       X                     X",
+      "X               XWWWWWWWWWWWWWWWWW   X                       X                     X",
+      "X            K  XWWWWWWWWWWWWWWWWW   X                       X               U  E  X",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H             XXXXXXXXX",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H             XXXXXXXXX",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H             XXXXXXXXX",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H             XXXXXXXXX",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H             XXXXXXXXX",
+      "X P      *XXXX  DWWWWWWWWWWWWWWWWW F G  !    T    !  B      _H    V        XXXXXXXXX",
       "XXXXXXXXJXXXXXXXX^^^^^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXX",
     ],
   },
@@ -2641,17 +2653,17 @@ const LEVELS = [
       "X               X                    X                       X                             X",
       "X               X                    X                       X                             X",
       "X               X           #####    X    #######            X         ######              X",
-      "X               XWWWWWWWW            X                       X CCC  ###                    X",
-      "X               XWWWWWWWW            S                       X                             X",
-      "X               XWWWWWWWW            X                       X                             X",
-      "X               XWWWWWWWW            X                       X                             X",
-      "X            K  XWWWWWWWW            X                       X                      U   E  X",
-      "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
-      "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
-      "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
-      "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
-      "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
-      "X P      *XXXXXXDWWWWWWWW          F G  !    T    !  B    _  H^^^^^^^^^   V       XXXXXXXXXX",
+      "X               XWWWWWWWWWWWWWWWWW   X                       X CCC  ###                    X",
+      "X               XWWWWWWWWWWWWWWWWW   S                       X                             X",
+      "X               XWWWWWWWWWWWWWWWWW   X                       X                             X",
+      "X               XWWWWWWWWWWWWWWWWW   X                       X                             X",
+      "X            K  XWWWWWWWWWWWWWWWWW   X                       X                      U   E  X",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H                    XXXXXXXXXX",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H                    XXXXXXXXXX",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H                    XXXXXXXXXX",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H                    XXXXXXXXXX",
+      "X         XXXX  DWWWWWWWWWWWWWWWWW   G                       H                    XXXXXXXXXX",
+      "X P      *XXXX  DWWWWWWWWWWWWWWWWW F G  !    T    !  B      _H^^^^^^^^^   V       XXXXXXXXXX",
       "XXXXXXXXJXXXXXXXX^^^^^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXXX",
     ],
   },
@@ -3751,22 +3763,24 @@ const SAVE_KEY = "rope-assassin-v1";
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, big: !!s.big, left: !!s.left, fade: !!s.fade, vib: s.vib !== false };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, left: !!s.left, fade: !!s.fade, vib: s.vib !== false };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, hard: false, vib: true };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true };
 }
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 const save = loadSave();
-let hard = save.hard;
-const bestTable = () => (hard ? save.bestH : save.best);
-const srTable = () => (hard ? save.srH : save.sr);
+// 0 normal, 1 hard, 2 master. `hard` stays true for master so every hard rule also applies there.
+let diff = save.diff, hard = diff >= 1, master = diff === 2;
+const DIFF_NAME = ["일반", "하드", "마스터"];
+const bestTable = () => [save.best, save.bestH, save.bestM][diff];
+const srTable = () => [save.sr, save.srH, save.srM][diff];
 function applyDifficulty() {
-  VIS = hard ? 270 : 210;
-  SEE_LIMIT = hard ? 0.2 : 0.45;
-  CRACK_T = hard ? 1.1 : 1.6;
-  REGROW_T = hard ? 6 : 4;
-  PATROL_V = hard ? 85 : 55;
-  WATCH_T = hard ? 1.6 : 2.6;
+  VIS = [210, 270, 300][diff];
+  SEE_LIMIT = [0.45, 0.2, 0.08][diff];
+  CRACK_T = [1.6, 1.1, 0.75][diff];
+  REGROW_T = [4, 6, 8][diff];
+  PATROL_V = [55, 85, 115][diff];
+  WATCH_T = [2.6, 1.6, 1.1][diff];
 }
 applyDifficulty();
 
@@ -4595,8 +4609,9 @@ function startLevel(i, keepStats) {
   $("menu").hidden = true; $("winBox").hidden = true; $("pauseBox").hidden = true; $("hud").hidden = false;
   keepAwake(true);
   fadeGoal();
-  $("hAct").textContent = ACTS[i] + " / " + LEVELS.length + (hard ? " · 하드 모드" : "");
+  $("hAct").textContent = ACTS[i] + " / " + LEVELS.length + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "");
   $("hAct").classList.toggle("hardtag", hard);
+  $("hAct").classList.toggle("mastertag", master);
   $("hName").textContent = LEVELS[i].name;
   $("hGoal").textContent = LEVELS[i].goal;
   syncHintText();
@@ -4676,7 +4691,7 @@ function runStageCleared() {
   const k = segKey(run.a, run.b), prev = srTable()[k];
   const better = !prev || run.t < prev.time;
   if (better) { srTable()[k] = { time: run.t, deaths: run.deaths }; writeSave(); }
-  $("wAct").textContent = `${hard ? "하드 " : ""}스피드런 · ${ACTS[run.a]} – ${ACTS[run.b]}`;
+  $("wAct").textContent = `${hard ? DIFF_NAME[diff] + " " : ""}스피드런 · ${ACTS[run.a]} – ${ACTS[run.b]}`;
   $("wTitle").textContent = better && prev ? "신기록" : "스피드런 완료";
   $("wTime").textContent = run.t.toFixed(1) + "초";
   $("wDeaths").textContent = run.deaths;
@@ -4700,7 +4715,7 @@ function win() {
   if (run) { runStageCleared(); return; }
   $("bRetry").textContent = "다시 하기";
   $("bWinMenu").hidden = false;
-  $("wAct").textContent = ACTS[cur] + " · " + LEVELS[cur].name + (hard ? " · 하드" : "");
+  $("wAct").textContent = ACTS[cur] + " · " + LEVELS[cur].name + (hard ? " · " + DIFF_NAME[diff] : "");
   const last = cur + 1 >= LEVELS.length;
   $("wTitle").textContent = last ? "성채 탈출" : "임무 완료";
   $("wTime").textContent = runTime.toFixed(1) + "초";
@@ -4743,11 +4758,14 @@ function renderLevelList() {
     const el = $("lv" + (next - 1));
     requestAnimationFrame(() => { try { el.scrollIntoView({ block: "center" }); } catch (e) {} });
   }
-  $("bHard").textContent = hard ? "하드 모드 켬" : "하드 모드 끔";
+  $("bHard").textContent = "난이도 · " + DIFF_NAME[diff];
   $("bHard").setAttribute("aria-pressed", String(hard));
+  $("bHard").classList.toggle("master", master);
   $("hardNote").hidden = !hard;
+  $("masterNote").hidden = !master;
   document.body.classList.toggle("hard", hard);
-  $("srTitle").textContent = hard ? "하드 스피드런" : "스피드런";
+  document.body.classList.toggle("master", master);
+  $("srTitle").textContent = hard ? DIFF_NAME[diff] + " 스피드런" : "스피드런";
   const sr = $("srList");
   sr.innerHTML = "";
   SEGMENTS.forEach(([a, b2], idx) => {
@@ -4784,7 +4802,8 @@ applyToggles();
 for (const [id, key] of [["bLeft", "left"], ["bFade", "fade"], ["bVib", "vib"]])
   $(id).addEventListener("click", () => { save[key] = !save[key]; writeSave(); applyToggles(); if (key === "vib") buzz(20); });
 $("bHard").addEventListener("click", () => {
-  hard = !hard; save.hard = hard; writeSave();
+  diff = (diff + 1) % 3; hard = diff >= 1; master = diff === 2;
+  save.diff = diff; save.hard = hard; writeSave();
   applyDifficulty(); renderLevelList();
 });
 $("bMenu").addEventListener("click", showMenu);
@@ -5252,6 +5271,7 @@ function drawPlayer(t) {
 
 function drawAim() {
   if (mode !== "play") return;
+  if (master && !touchMode) return;
   if (touchMode && touchAim === null) return;
   const h = L.hook; if (h.state === "flying") return;
   const a = probeAim();
@@ -5291,6 +5311,13 @@ function drawVignette() {
   v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, hv ? "rgba(20,0,0,0.88)" : "rgba(0,0,0,0.55)");
   ctx.fillStyle = v; ctx.fillRect(0, 0, w, h);
   if (hv) { ctx.fillStyle = "rgba(120,20,30,0.08)"; ctx.fillRect(0, 0, w, h); }
+  if (master && inGame && L.player) {
+    const p = L.player, px = (p.x + p.w / 2 - cam.x) * scale, py = (p.y + p.h / 2 - cam.y) * scale;
+    const r = TS * scale;
+    const lamp = ctx.createRadialGradient(px, py, r * 2.2, px, py, r * 6.5);
+    lamp.addColorStop(0, "rgba(4,2,8,0)"); lamp.addColorStop(1, "rgba(4,2,8,0.96)");
+    ctx.fillStyle = lamp; ctx.fillRect(0, 0, w, h);
+  }
   if (mode === "dead") { ctx.fillStyle = `rgba(120,20,20,${0.25 * Math.max(0, 1 - deadT)})`; ctx.fillRect(0, 0, w, h); }
 }
 
