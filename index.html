@@ -233,7 +233,7 @@
     </div>
     <p class="lead">밤의 성채에 숨어든 자객. 쇠갈고리 하나로 들보와 벽을 타고, 막마다 다른 장치를 풀어 출구까지 가라.</p>
     <p class="startotal" id="starTotal"></p>
-    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bHard" type="button" aria-pressed="false">난이도 · 일반</button><button id="bInstall" type="button" hidden>앱 설치</button></div>
+    <div class="row"><button class="primary" id="bCont" type="button">이어하기</button><button id="bDaily" type="button">오늘의 도전</button><button id="bHard" type="button" aria-pressed="false">난이도 · 일반</button><button id="bInstall" type="button" hidden>앱 설치</button></div>
     <details class="fold" id="settings">
       <summary>설정</summary>
       <div class="row">
@@ -334,9 +334,10 @@
 
 // ---------- constants ----------
 const TS = 32, VW = 960, VH = 540;
-const GRAV = 1700, MAXFALL = 860, RUN = 220, ACC_G = 2600, ACC_A = 1700, JUMP = 520;
+const MAXFALL = 860, ACC_G = 2600, ACC_A = 1700, JUMP = 520;
 const HOOK_SPEED = 2100, REEL = 280, ROPE_MIN = 22;
 let HOOK_RANGE = 384, ROPE_MAX = 420; // scaled by the 청록 scarf
+let GRAV = 1700, RUN = 220; // changed by daily-challenge twists
 const SWING_ACC = 1150, PULL_SPEED = 430;
 const SPRING = 930, WIND_UP = 300, WIND_ACC = 2600;
 const VIS_HALF = 0.48;
@@ -4871,12 +4872,31 @@ const SAVE_KEY = "rope-assassin-v1";
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "" };
   } catch (e) {}
   return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true };
 }
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
 const save = loadSave();
+// Daily challenge: one stage and one twist per calendar day; clearing it on consecutive days builds a streak.
+const DAILY_MODS = [
+  { name: "저중력", desc: "몸이 가볍다 · 중력 70%" },
+  { name: "경비 강화", desc: "경비가 빠르고 금방 알아챈다" },
+  { name: "질풍", desc: "달리기 속도 +30%" },
+  { name: "칠흑", desc: "등불 하나만 비춘다" },
+];
+let daily = null; // the challenge being played right now, or null
+function dayKey(off = 0) { const d = new Date(Date.now() + off * 864e5); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+function todaysDaily() {
+  const today = dayKey();
+  if (!save.daily || save.daily.date !== today) {
+    let h = 2166136261; for (const c of today) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    const pool = Math.max(5, Math.min(200, save.unlocked));
+    save.daily = { date: today, lvl: h % pool, mod: (h >>> 8) % DAILY_MODS.length, best: null };
+    writeSave();
+  }
+  return save.daily;
+}
 // Ghosts: your best run of each stage, replayed as a shadow you race against.
 // Positions are sampled 15 times per in-game second and kept in their own key so the save stays small.
 const GHOST_KEY = "rope-assassin-ghost-v1", GHOST_HZ = 15, GHOST_MAX = 60;
@@ -4910,6 +4930,10 @@ function applyDifficulty() {
   REGROW_T = [4, 6, 8][diff];
   PATROL_V = [55, 85, 115][diff];
   WATCH_T = [2.6, 1.6, 1.1][diff];
+  const m = daily ? daily.mod : -1;
+  GRAV = m === 0 ? 1190 : 1700;
+  RUN = m === 2 ? 286 : 220;
+  if (m === 1) { PATROL_V *= 1.5; WATCH_T *= 0.6; SEE_LIMIT *= 0.5; }
 }
 applyDifficulty();
 
@@ -5754,14 +5778,14 @@ function startLevel(i, keepStats) {
   if (!keepStats) {
     runTime = 0; runDeaths = 0; showCard(); ghostRec = [];
     const g = ghosts[ghostId(i)];
-    ghostPlay = g ? g.d.split(",").map((v) => parseInt(v, 36)) : null;
+    ghostPlay = g && !daily ? g.d.split(",").map((v) => parseInt(v, 36)) : null;
   }
   mode = "play";
   jumpQueued = false;
   $("menu").hidden = true; $("winBox").hidden = true; $("pauseBox").hidden = true; $("hud").hidden = false;
   keepAwake(true);
   fadeGoal();
-  $("hAct").textContent = ACTS[i] + " / " + LEVELS.length + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "");
+  $("hAct").textContent = ACTS[i] + " / " + LEVELS.length + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : "");
   $("hAct").classList.toggle("hardtag", hard);
   $("hAct").classList.toggle("mastertag", master);
   $("hName").textContent = LEVELS[i].name;
@@ -5831,7 +5855,32 @@ function startRun(a, b) {
   run = { a, b, t: 0, deaths: 0, done: false };
   startLevel(a, false);
 }
-function winNext() { if (run) { run = null; showMenu(); } else nextLevel(); }
+function startDaily() {
+  run = null; daily = todaysDaily(); applyDifficulty();
+  startLevel(daily.lvl, false);
+  toast(`오늘의 도전 · ${DAILY_MODS[daily.mod].name} · ${DAILY_MODS[daily.mod].desc}`);
+}
+function dailyCleared() {
+  const d = save.daily, t = runTime, first = save.dailyLast !== d.date;
+  if (first) { save.streak = save.dailyLast === dayKey(-1) ? save.streak + 1 : 1; save.dailyLast = d.date; }
+  const better = d.best === null || t < d.best;
+  if (better) d.best = t;
+  writeSave();
+  $("wAct").textContent = `오늘의 도전 · ${ACTS[cur]} · ${DAILY_MODS[d.mod].name}`;
+  $("wTitle").textContent = first ? "오늘의 도전 완료" : better ? "오늘의 신기록" : "오늘의 도전 완료";
+  $("wStars").innerHTML = "";
+  $("wStarNote").textContent = `연속 ${save.streak}일째 · 내일 새 도전이 열린다`;
+  $("wTime").textContent = t.toFixed(1) + "초";
+  $("wDeaths").textContent = runDeaths;
+  $("wBest").textContent = d.best.toFixed(1) + "초";
+  $("bNext").innerHTML = "<kbd>Enter</kbd> 메뉴로";
+  $("bRetry").textContent = "다시 도전";
+  $("bWinMenu").hidden = true;
+  $("winBox").hidden = false; $("hud").hidden = true;
+  syncTouchUI();
+  setTimeout(() => $("bNext").focus(), 30);
+}
+function winNext() { if (daily) { showMenu(); return; } if (run) { run = null; showMenu(); } else nextLevel(); }
 function winRetry() { if (run) startRun(run.a, run.b); else startLevel(cur, false); }
 function runStageCleared() {
   if (cur < run.b) {
@@ -5872,6 +5921,7 @@ function totalStars() {
 function win() {
   mode = "win";
   sfx.win();
+  if (daily) { dailyCleared(); return; }
   const prev = bestTable()[cur];
   const stars = starsOf(cur, runTime, runDeaths);
   const rec = { time: runTime, deaths: runDeaths, stars: Math.max(stars, (prev && prev.stars) || 0) };
@@ -5901,6 +5951,7 @@ function win() {
 function showMenu() {
   mode = "menu";
   run = null;
+  if (daily) { daily = null; applyDifficulty(); }
   $("pauseBox").hidden = true;
   keepAwake(false);
   $("menu").hidden = false; $("winBox").hidden = true; $("hud").hidden = true;
@@ -5912,6 +5963,8 @@ function renderLevelList() {
   box.innerHTML = "";
   const next = Math.min(LEVELS.length, save.unlocked);
   $("bCont").textContent = next > 1 ? `이어하기 · ${ACTS[next - 1]}` : "시작하기";
+  const dd = todaysDaily();
+  $("bDaily").textContent = `오늘의 도전 · ${ACTS[dd.lvl]} · ${DAILY_MODS[dd.mod].name}` + (save.dailyLast === dd.date ? " ✓" : "");
   LEVELS.forEach((lv, i) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "lv"; b.id = "lv" + i;
@@ -5955,6 +6008,7 @@ function renderLevelList() {
   });
 }
 $("bRestart").addEventListener("click", () => { restartLevel(); cv.focus(); });
+$("bDaily").addEventListener("click", () => { ensureAudio(); startDaily(); });
 $("bCont").addEventListener("click", () => { ensureAudio(); startLevel(Math.min(LEVELS.length, save.unlocked) - 1, false); });
 $("bSound").addEventListener("click", () => { ensureAudio(); toggleMute(); });
 function applyBig() {
@@ -6542,7 +6596,7 @@ function drawVignette() {
   v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, hv ? "rgba(20,0,0,0.88)" : "rgba(0,0,0,0.55)");
   ctx.fillStyle = v; ctx.fillRect(0, 0, w, h);
   if (hv) { ctx.fillStyle = "rgba(120,20,30,0.08)"; ctx.fillRect(0, 0, w, h); }
-  if (master && inGame && L.player) {
+  if ((master || (daily && daily.mod === 3)) && inGame && L.player) {
     const p = L.player, px = (p.x + p.w / 2 - cam.x) * scale, py = (p.y + p.h / 2 - cam.y) * scale;
     const r = TS * scale;
     const lamp = ctx.createRadialGradient(px, py, r * 2.2, px, py, r * 6.5);

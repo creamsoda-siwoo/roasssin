@@ -1,5 +1,5 @@
 // Offline cache for the game. Bump VERSION whenever index.html changes so phones pick up the update.
-const VERSION = "v21";
+const VERSION = "v22";
 const CACHE = "rope-assassin-" + VERSION;
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-maskable.png", "./apple-touch-icon.png"];
 
