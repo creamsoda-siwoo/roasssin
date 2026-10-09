@@ -246,6 +246,7 @@
       <dt><kbd>왼쪽 스틱</kbd></dt><dd>좌우 이동·흔들기 · 위로 밀면 줄 감기, 아래로 밀면 줄 풀기</dd>
       <dt><kbd>점프</kbd></dt><dd>점프 · 매달려 있을 때는 줄을 놓고 도약</dd>
       <dt><kbd>놓기</kbd></dt><dd>줄 놓기</dd>
+      <dt><kbd style="color:#b48cf0">▲</kbd> <kbd style="color:#9fe0ff">〰</kbd> <kbd style="color:#ffd47a">◆</kbd></dt><dd>파워업 · 보라 망토는 8초 투명, 하늘색 신발은 12초 2단 점프, 금색 부적은 죽음을 한 번 막아 준다</dd>
     </dl>
     <dl class="controls mouse-only">
       <dt><kbd>클릭</kbd></dt><dd>후크 발사 · 나무 들보에만 걸린다 (매달린 채 다시 클릭하면 새로 건다)</dd>
@@ -254,6 +255,7 @@
       <dt><kbd>Space</kbd></dt><dd>점프 · 매달려 있을 때는 줄을 놓고 도약</dd>
       <dt><kbd>우클릭</kbd> <kbd>Q</kbd></dt><dd>줄 놓기</dd>
       <dt><kbd>R</kbd> <kbd>M</kbd></dt><dd>재시작 · 소리 켜기/끄기</dd>
+      <dt><kbd style="color:#b48cf0">▲</kbd> <kbd style="color:#9fe0ff">〰</kbd> <kbd style="color:#ffd47a">◆</kbd></dt><dd>파워업 · 보라 망토는 8초 투명, 하늘색 신발은 12초 2단 점프, 금색 부적은 죽음을 한 번 막아 준다</dd>
     </dl>
     </details>
   </div>
@@ -308,6 +310,7 @@ const STEP = 1 / 120;
 // G gate, closed until a switch flips  g gate, open until a switch flips
 // C rotten beam (hookable, breaks soon after the hook bites, regrows)
 // D locked door (key)  H shutter (open while every _ plate is pressed)  E exit
+// * shadow cloak (guards cannot see you)  + wind boots (double jump)  $ guardian charm (survive one hit)
 // F checkpoint flag (touch it and you respawn there)  O / Q teleport doors (two of each letter, linked)  I ice floor (solid, slippery)
 // J spring pad (solid, launches you upward)  W updraft (rising air, lifts you while inside)
 // P start  K key  B crate  T patrol guard  Y/U static guard facing left/right  V watcher (turns around)  ! patrol turn marker
@@ -412,7 +415,7 @@ const LEVELS = [
       "#                                          #",
       "#                                          #",
       "#                                          #",
-      "# P        !         T         !     Y  E  #",
+      "# P       *!         T         !     Y  E  #",
       "############################################",
     ],
   },
@@ -435,7 +438,7 @@ const LEVELS = [
       "X       XX              S                    X",
       "X                       G                 gggX",
       "X                       G                 g  X",
-      "X P      _      ^^^^^   G  !    T       ! g KX",
+      "X P      _     *^^^^^   G  !    T       ! g KX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -533,7 +536,7 @@ const LEVELS = [
       "X                                          X",
       "X                                          X",
       "X                                          X",
-      "X P                 V                      X",
+      "X P       *         V                      X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX    XXXXX",
       "X                                          X",
       "X                                          X",
@@ -589,7 +592,7 @@ const LEVELS = [
       "X                    X                X                  #",
       "X                    H                G                  #",
       "X                    H                G                  #",
-      "X P    ^^^^^^^^ B _  H  !     T     ! G  ^^^^            X",
+      "X P   *^^^^^^^^ B _  H  !     T     ! G  ^^^^            X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -668,7 +671,7 @@ const LEVELS = [
       "X  ####     #X",
       "X           #X",
       "X           #X",
-      "X P         #X",
+      "X P        +#X",
       "XXXXXXXXXXXXXX",
     ],
   },
@@ -688,7 +691,7 @@ const LEVELS = [
       "X  XXX                           XXXXXXXXX",
       "X                                H       X",
       "X                                H       X",
-      "X P    _   ^^^^^^   _  B  ^^^    H   E   X",
+      "X P    _  $^^^^^^   _  B  ^^^    H   E   X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -838,7 +841,7 @@ const LEVELS = [
       "X                                  E   X",
       "X                             XXXXXXXXXX",
       "X                             XXXXXXXXXX",
-      "X P     ^^^^^^        B       XXXXXXXXXX",
+      "X P    $^^^^^^        B       XXXXXXXXXX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -863,7 +866,7 @@ const LEVELS = [
       "X         ##              ##           X",
       "X         ##              ##           X",
       "X         ##              ##           X",
-      "X P       ##^^^^^^^^^^^^^^##       E   X",
+      "X P      $##^^^^^^^^^^^^^^##       E   X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -921,7 +924,7 @@ const LEVELS = [
       "X           #X",
       "X           #X",
       "X           #X",
-      "X P         #X",
+      "X P        +#X",
       "XXXXXXXXXXXXXX",
     ],
   },
@@ -942,7 +945,7 @@ const LEVELS = [
       "X                 D       XXX       D           D    X",
       "X                 D       XXX       D           D    X",
       "X                 D       XXX       D           D    X",
-      "X P               D ^^^^^^XXX^^^^^  D           D  E X",
+      "X P              $D ^^^^^^XXX^^^^^  D           D  E X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1007,7 +1010,7 @@ const LEVELS = [
       "X              D                   G               H             X",
       "X              D                   G               H             X",
       "X              D                   G               H             X",
-      "X P            D  ^^^^^^^^^^^^^^ F G  !   T   ! B _H    U     E  X",
+      "X P           *D  ^^^^^^^^^^^^^^ F G  !   T   ! B _H    U     E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1028,7 +1031,7 @@ const LEVELS = [
       "X               XXXXXXXXXXXXXXXXXXX            X",
       "X               XXXXXXXXXXXXXXXXXXX            X",
       "X               XXXXXXXXXXXXXXXXXXX            X",
-      "X P             XXXXXXXXXXXXXXXXXXX         E  X",
+      "X P            *XXXXXXXXXXXXXXXXXXX         E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1048,7 +1051,7 @@ const LEVELS = [
       "X                     H                X",
       "X                     H                X",
       "X                     H                X",
-      "X P            _      H  ^^^^^     E   X",
+      "X P            _     $H  ^^^^^     E   X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1079,7 +1082,7 @@ const LEVELS = [
       "X              X",
       "X              X",
       "X              X",
-      "X P            X",
+      "X P           +X",
       "XXXXXXXXXXXXXXXX",
     ],
   },
@@ -1100,7 +1103,7 @@ const LEVELS = [
       "X                       D      XX       D        X",
       "X                       D      XX       D        X",
       "X                       D      XX       D        X",
-      "X P                     D  ^^^^XX^^^^   D     E  X",
+      "X P                    $D  ^^^^XX^^^^   D     E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1225,7 +1228,7 @@ const LEVELS = [
       "X             H                  G                 D                 X",
       "X             H                  G                 D                 X",
       "X             H                  G                 D                 X",
-      "X P    B   _  H ^^^^^^^^^^^^^^ F G     V           D    U        E   X",
+      "X P   *B   _  H ^^^^^^^^^^^^^^ F G     V           D    U        E   X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1285,7 +1288,7 @@ const LEVELS = [
       "X                                 E    X",
       "X                         XXXXXXXXXXXXXX",
       "X                         XXXXXXXXXXXXXX",
-      "X P    ^^^      B         XXXXXXXXXXXXXX",
+      "X P   $^^^      B         XXXXXXXXXXXXXX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1320,7 +1323,7 @@ const LEVELS = [
       "X              X",
       "X   ####       X",
       "X              X",
-      "X P            X",
+      "X P           +X",
       "XXXXXXXXXXXXXXXX",
     ],
   },
@@ -1382,7 +1385,7 @@ const LEVELS = [
       "X                K            D            X",
       "X               XXXX          D            X",
       "X               XXXX          D            X",
-      "X P     B       XXXX          D       E    X",
+      "X P    $B       XXXX          D       E    X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1399,7 +1402,7 @@ const LEVELS = [
       "X                                                          X",
       "X                                                          X",
       "X                                                          X",
-      "X P       !     T     !         Y     !     T     !     E  X",
+      "X P   *   !     T     !         Y     !     T     !     E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1461,7 +1464,7 @@ const LEVELS = [
       "X                                                X",
       "X                                                X",
       "X                   XXXXXXXXXX                   X",
-      "X P                 XXXXXXXXXX               E   X",
+      "X P       $         XXXXXXXXXX               E   X",
       "XXXXXXXXXXX         XXXXXXXXXX         XXXXXXXXXXX",
       "XXXXXXXXXXX         XXXXXXXXXX         XXXXXXXXXXX",
       "XXXXXXXXXXX         XXXXXXXXXX         XXXXXXXXXXX",
@@ -1541,7 +1544,7 @@ const LEVELS = [
       "X#          #X",
       "X#          #X",
       "X#          #X",
-      "X# P        #X",
+      "X# P       +#X",
       "XXXXXXXXXXXXXX",
     ],
   },
@@ -1562,7 +1565,7 @@ const LEVELS = [
       "X                          XXX                  D D D  X",
       "X                          XXX                  D D D  X",
       "X                          XXX                  D D D  X",
-      "X P                 ^^^^^^^XXX^^^^^^^           D D D EX",
+      "X P                $^^^^^^^XXX^^^^^^^           D D D EX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1585,7 +1588,7 @@ const LEVELS = [
       "X#####          XXXXXXX         XXXXXXX            X",
       "X#####          XXXXXXX         XXXXXXX            X",
       "X#####          XXXXXXX         XXXXXXX            X",
-      "X#####          XXXXXXX!   T   !XXXXXXX   U     E  X",
+      "X#####         *XXXXXXX!   T   !XXXXXXX   U     E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1622,7 +1625,7 @@ const LEVELS = [
       "X  ####      X",
       "X            X",
       "X            X",
-      "X P          X",
+      "X P         +X",
       "XXXXXXXXXXXXXX",
     ],
   },
@@ -1641,7 +1644,7 @@ const LEVELS = [
       "X             X             X             X            X",
       "X             G             g             G            X",
       "X             G             g             G            X",
-      "X P           G  !   T    ! g  ^^^^^^     G       E    X",
+      "X P        *  G  !   T    ! g  ^^^^^^     G       E    X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1727,7 +1730,7 @@ const LEVELS = [
       "X           XXXXX             XXXXX                X",
       "X           XXXXX             XXXXX                X",
       "X           XXXXX             XXXXX                X",
-      "X P         XXXXX             XXXXX         U    E X",
+      "X P        *XXXXX             XXXXX         U    E X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1747,7 +1750,7 @@ const LEVELS = [
       "X                           H                X",
       "X                           H                X",
       "X                           H                X",
-      "X P       _           _     H           E    X",
+      "X P       _           _    $H           E    X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1803,7 +1806,7 @@ const LEVELS = [
       "X                       D         XX            D      X",
       "X                       D         XX            D      X",
       "X                       D         XX            D      X",
-      "X P               U     D ^^^^^^^^XX      Y     D   E  X",
+      "X P     *         U     D ^^^^^^^^XX      Y     D   E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -1862,7 +1865,7 @@ const LEVELS = [
       "X              X",
       "X   ####       X",
       "X              X",
-      "X P            X",
+      "X P           +X",
       "XXXXXXXXXXXXXXXX",
     ],
   },
@@ -1969,7 +1972,7 @@ const LEVELS = [
       "X           XXXXX         XXXXX         XXXXX          X",
       "X           XXXXX         XXXXX         XXXXX          X",
       "X           XXXXX         XXXXX         XXXXX          X",
-      "X P         XXXXX         XXXXX         XXXXX       E  X",
+      "X P        *XXXXX         XXXXX         XXXXX       E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2049,7 +2052,7 @@ const LEVELS = [
       "X                 XXXXXXXXX       D                  X",
       "X                 XXXXXXXXX       D                  X",
       "X                 XXXXXXXXX       D                  X",
-      "X P               XXXXXXXXX       D     U         E  X",
+      "X P              *XXXXXXXXX       D     U         E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2086,7 +2089,7 @@ const LEVELS = [
       "X  ####        X",
       "X              X",
       "X              X",
-      "X P            X",
+      "X P           +X",
       "XXXXXXXXXXXXXXXX",
     ],
   },
@@ -2123,7 +2126,7 @@ const LEVELS = [
       "X           G                         g                    X",
       "X           G                         g                    X",
       "X           G                         g                    X",
-      "X P         G ^^^^^^^^^^^^^^^^^^^^    g     !    T    !  E X",
+      "X P        *G ^^^^^^^^^^^^^^^^^^^^    g     !    T    !  E X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2144,7 +2147,7 @@ const LEVELS = [
       "X                      XX                  XXXX   D D D D      X",
       "X                      XX                  XXXX   D D D D      X",
       "X                      XX                  XXXX   D D D D      X",
-      "X P              ^^^^^^XX^^^^^^            XXXX   D D D D   E  X",
+      "X P             $^^^^^^XX^^^^^^            XXXX   D D D D   E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2188,7 +2191,7 @@ const LEVELS = [
       "X                XXXXXXXXXXXXXXXXXXX",
       "X                XXXXXXXXXXXXXXXXXXX",
       "X                XXXXXXXXXXXXXXXXXXX",
-      "X P              XXXXXXXXXXXXXXXXXXX",
+      "X P             $XXXXXXXXXXXXXXXXXXX",
       "XXXXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2209,7 +2212,7 @@ const LEVELS = [
       "X         WWWWXX  WWWW                 X",
       "X         WWWWXX  WWWW                 X",
       "X         WWWWXX  WWWW                 X",
-      "X P       WWWWXX  WWWW            E    X",
+      "X P      $WWWWXX  WWWW            E    X",
       "XXXXXXXXXXXXXXXXXX^^^^^^XXXXXXXXXXXXXXXX",
     ],
   },
@@ -2232,7 +2235,7 @@ const LEVELS = [
       "X           XXXXXX XXXXXXXXXXXXXXX",
       "X           XXXXXX XXXXXXXXXXXXXXX",
       "X           XXXXXX XXXXXXXXXXXXXXX",
-      "X P         XXXXXX^XXXXXXXXXXXXXXX",
+      "X P        $XXXXXX^XXXXXXXXXXXXXXX",
       "XXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2274,7 +2277,7 @@ const LEVELS = [
       "X             XXXXX                              X",
       "X             XXXXX                              X",
       "X             XXXXX                              X",
-      "X P           XXXXX           U         V     E  X",
+      "X P          *XXXXX           U         V     E  X",
       "XXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2311,7 +2314,7 @@ const LEVELS = [
       "X   WWWW       X",
       "X   WWWW       X",
       "X   WWWW       X",
-      "X P WWWW       X",
+      "X P WWWW      +X",
       "XXXXXXXXXXXXXXXX",
     ],
   },
@@ -2332,7 +2335,7 @@ const LEVELS = [
       "X                 WWWWW           D            X",
       "X                 WWWWW           D            X",
       "X                 WWWWW           D            X",
-      "X P               WWWWW           D       E    X",
+      "X P               WWWWW          $D       E    X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2376,7 +2379,7 @@ const LEVELS = [
       "X                 G              WWWWWWWWWXXXXXXXXXXXX",
       "X                 G              WWWWWWWWWXXXXXXXXXXXX",
       "X                 G              WWWWWWWWWXXXXXXXXXXXX",
-      "X P               G  !    T    ! WWWWWWWWWXXXXXXXXXXXX",
+      "X P             * G  !    T    ! WWWWWWWWWXXXXXXXXXXXX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX^^^^^^^^^XXXXXXXXXXXX",
     ],
   },
@@ -2400,7 +2403,7 @@ const LEVELS = [
       "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
       "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
       "X         XXXXXXDWWWWWWWWW           G                       H             XXXXXXXXX",
-      "X P       XXXXXXDWWWWWWWWW         F G  !    T    !  B    _  H    V        XXXXXXXXX",
+      "X P      *XXXXXXDWWWWWWWWW         F G  !    T    !  B    _  H    V        XXXXXXXXX",
       "XXXXXXXXJXXXXXXXX^^^^^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXX",
     ],
   },
@@ -2421,7 +2424,7 @@ const LEVELS = [
       "X         XXXXXXWWWXXXXXXXXXXXXXXX",
       "X         XXXXXXWWWXXXXXXXXXXXXXXX",
       "X         XXXXXXWWWXXXXXXXXXXXXXXX",
-      "X P       XXXXXX^^^XXXXXXXXXXXXXXX",
+      "X P      $XXXXXX^^^XXXXXXXXXXXXXXX",
       "XXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2442,7 +2445,7 @@ const LEVELS = [
       "X          XXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
       "X          XXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
       "X          XXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-      "X P        XXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "X P       *XXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
       "XXXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2481,7 +2484,7 @@ const LEVELS = [
       "XWWWW          X",
       "XWWWW          X",
       "XWWWW          X",
-      "XWPWW          X",
+      "XWPWW         +X",
       "XXXXXXXXXXXXXXXX",
     ],
   },
@@ -2502,7 +2505,7 @@ const LEVELS = [
       "X             XXXXXXXXX         D              X",
       "X             XXXXXXXXX         D              X",
       "X             XXXXXXXXX         D              X",
-      "X P           XXXXXXXXX         D     U     E  X",
+      "X P          *XXXXXXXXX         D     U     E  X",
       "XXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2566,7 +2569,7 @@ const LEVELS = [
       "X       WWWWW       WWWWW       WWWWW       D D D      X",
       "X       WWWWW       WWWWW       WWWWW       D D D      X",
       "X       WWWWW       WWWWW       WWWWW       D D D      X",
-      "X P     WWWWW       WWWWW       WWWWW       D D D   E  X",
+      "X P     WWWWW       WWWWW       WWWWW      $D D D   E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2589,7 +2592,7 @@ const LEVELS = [
       "X      XXXXXX XXXXXXXXXXXX",
       "X      XXXXXX XXXXXXXXXXXX",
       "X      XXXXXX XXXXXXXXXXXX",
-      "X P    XXXXXX XXXXXXXXXXXX",
+      "X P   +XXXXXX XXXXXXXXXXXX",
       "XXXXXJXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2635,7 +2638,7 @@ const LEVELS = [
       "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
       "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
       "X         XXXXXXDWWWWWWWW            G                       H                    XXXXXXXXXX",
-      "X P       XXXXXXDWWWWWWWW          F G  !    T    !  B    _  H^^^^^^^^^   V       XXXXXXXXXX",
+      "X P      *XXXXXXDWWWWWWWW          F G  !    T    !  B    _  H^^^^^^^^^   V       XXXXXXXXXX",
       "XXXXXXXXJXXXXXXXX^^^^^^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXJXXXXXXXXXXX",
     ],
   },
@@ -2654,7 +2657,7 @@ const LEVELS = [
       "X               X                  X",
       "X               X                  X",
       "X               X     O            X",
-      "X P       O     X               E  X",
+      "X P     $ O     X               E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2673,7 +2676,7 @@ const LEVELS = [
       "X                                          X",
       "X                                          X",
       "X                                          X",
-      "X P                   ^^               E   X",
+      "X P                  $^^               E   X",
       "XXXXXIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIXXX",
     ],
   },
@@ -2694,7 +2697,7 @@ const LEVELS = [
       "X                   XXXXXXXXXXXXXXXXXXXX",
       "X                   XXXXXXXXXXXXXXXXXXXX",
       "X                   XXXXXXXXXXXXXXXXXXXX",
-      "X P         O       XXXXXXXXXXXXXXXXXXXX",
+      "X P       $ O       XXXXXXXXXXXXXXXXXXXX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2736,7 +2739,7 @@ const LEVELS = [
       "X                   X       X           D      X",
       "X                   X       X           D      X",
       "X                   XO      X    Q      D      X",
-      "X P     O           X   K  QX           D   E  X",
+      "X P   $ O           X   K  QX           D   E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2757,7 +2760,7 @@ const LEVELS = [
       "X                       IIIIII  IIIIIIIIIX",
       "X                       IIIIII  IIIIIIIIIX",
       "X               IIIIII  IIIIII  IIIIIIIIIX",
-      "X               IIIIII  IIIIII  IIIIIIIIIX",
+      "X            +  IIIIII  IIIIII  IIIIIIIIIX",
       "X       IIIIII  IIIIII  IIIIII  IIIIIIIIIX",
       "X P     IIIIII  IIIIII  IIIIII  IIIIIIIIIX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
@@ -2799,7 +2802,7 @@ const LEVELS = [
       "X              WWWWWWWWWWWWXXXXXXXXXXXXXXXXXXX",
       "X              WWWWWWWWWWWWXXXXXXXXXXXXXXXXXXX",
       "X              WWWWWWWWWWWWXXXXXXXXXXXXXXXXXXX",
-      "X P            WWWWWWWWWWWWXXXXXXXXXXXXXXXXXXX",
+      "X P           $WWWWWWWWWWWWXXXXXXXXXXXXXXXXXXX",
       "XIIIIIIIIIIIIII^^^^^^^^^^^^XXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2820,7 +2823,7 @@ const LEVELS = [
       "X             G                X            XXXXXXXXXXXX",
       "X             G                X            XXXXXXXXXXXX",
       "X             G                X  O         XXXXXXXXXXXX",
-      "X P           G  !    T    ! O X        Q   XXXXXXXXXXXX",
+      "X P         * G  !    T    ! O X        Q   XXXXXXXXXXXX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2843,7 +2846,7 @@ const LEVELS = [
       "X           XXXXXXX     WWWWWWWWWW   G                   D                         XXXXXXXXXXXXX",
       "X           XXXXXXX     WWWWWWWWWW   G                   D                         XXXXXXXXXXXXX",
       "X           XXXXXXX  O  WWWWWWWWWW   G                   D                         XXXXXXXXXXXXX",
-      "X P         XXXXXXX     WWWWWWWWWW F G  !     T     !    D      V         U        XXXXXXXXXXXXX",
+      "X P        *XXXXXXX     WWWWWWWWWW F G  !     T     !    D      V         U        XXXXXXXXXXXXX",
       "XXXXXXXXXXJXXXXXXXXXXXXX^^^^^^^^^^XXXXXXXXXXXXXXXXXXXXXXXXIIIIIIIIIIIIIIIXXXXXXXJXXXXXXXXXXXXXXX",
     ],
   },
@@ -2862,7 +2865,7 @@ const LEVELS = [
       "X            X               X                 X",
       "X            X               X                 X",
       "X            X   O           X   Q             X",
-      "X P     O    X          Q    X          U   E  X",
+      "X P   * O    X          Q    X          U   E  X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2883,7 +2886,7 @@ const LEVELS = [
       "X                XXXXXXXXXXXXXXXXXXXXXXX",
       "X                XXXXXXXXXXXXXXXXXXXXXXX",
       "X                XXXXXXXXXXXXXXXXXXXXXXX",
-      "X P              XXXXXXXXXXXXXXXXXXXXXXX",
+      "X P             +XXXXXXXXXXXXXXXXXXXXXXX",
       "XXXXXIIIIIIIIIJXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2904,7 +2907,7 @@ const LEVELS = [
       "X               WWWWW           D            X",
       "X               WWWWW           D            X",
       "X               WWWWW           D            X",
-      "X P             WWWWW           D       E    X",
+      "X P             WWWWW          $D       E    X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -2946,7 +2949,7 @@ const LEVELS = [
       "X             XXXXXXXXXXX       D            X",
       "X             XXXXXXXXXXX       D            X",
       "X             XXXXXXXXXXX       D            X",
-      "X P           XXXXXXXXXXX       D        E   X",
+      "X P          *XXXXXXXXXXX       D        E   X",
       "XXXXXXXXXXXXJXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
@@ -3004,7 +3007,7 @@ const LEVELS = [
       "X          WWWWX",
       "X          WWWWX",
       "X          WWWWX",
-      "X          WWPWX",
+      "X+         WWPWX",
       "XXXXXXXXXXXXXXXX",
     ],
   },
@@ -3334,7 +3337,7 @@ function buildLevel(i) {
   const def = LEVELS[i];
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -3350,12 +3353,13 @@ function buildLevel(i) {
       else if (c === "E") st.exit = { x: x * TS, y: y * TS, w: TS, h: TS };
       else if (c === "O" || c === "Q") st.portals[c].push({ tx: x, ty: y });
       else if (c === "F") { st.flags.push({ tx: x, ty: y, on: false }); c = " "; }
+      else if (c === "*" || c === "+" || c === "$") { st.powers.push({ kind: c, x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
       if (c === "D") st.needKey = true;
       row.push(c);
     }
     st.grid.push(row);
   }
-  st.player = { x: st.start.x, y: st.start.y, w: PW, h: PH, vx: 0, vy: 0, ground: false, coyote: 0, jbuf: 0, face: 1, keys: 0, run: 0, scarf: [] };
+  st.player = { cloak: 0, boots: 0, airJump: false, shield: false, invul: 0, x: st.start.x, y: st.start.y, w: PW, h: PH, vx: 0, vy: 0, ground: false, coyote: 0, jbuf: 0, face: 1, keys: 0, run: 0, scarf: [] };
   for (let k = 0; k < 8; k++) st.player.scarf.push({ x: st.start.x + PW / 2, y: st.start.y + 8 });
   st.hook = { state: "idle", x: 0, y: 0, dx: 0, dy: 0, dist: 0, ax: 0, ay: 0, len: 0, crate: null };
   st.sky = makeSky(i, W);
@@ -3619,9 +3623,16 @@ function updatePlayer(dt) {
       burst(p.x + p.w / 2, p.y + p.h, 6, "#e9e3d3", 80);
     } else if (p.coyote > 0) {
       p.vy = -JUMP; p.coyote = 0; p.jbuf = 0; sfx.jump();
+    } else if (p.boots > 0 && p.airJump) {
+      p.vy = -JUMP * 0.95; p.airJump = false; p.jbuf = 0; sfx.jump();
+      burst(p.x + p.w / 2, p.y + p.h, 10, "#9fe0ff", 120);
     }
   }
-  if (p.ground) p.hookJump = false;
+  if (p.ground) { p.hookJump = false; p.airJump = true; }
+  if (hooked) p.airJump = true;
+  if (p.cloak > 0) p.cloak -= dt;
+  if (p.boots > 0) p.boots -= dt;
+  if (p.invul > 0) p.invul -= dt;
   if (p.vy >= 0) p.boost = false;
   if (!keys.Space && p.vy < -260 && !hooked && !p.ground && !p.hookJump && !p.boost) p.vy += GRAV * 0.9 * dt;
 
@@ -3717,6 +3728,7 @@ function updateCrates(dt) {
 
 function canSee(g) {
   const p = L.player;
+  if (p.cloak > 0 || p.invul > 0) return false;
   const ex = g.x + g.w / 2 + g.dir * 4, ey = g.y + 8;
   const pts = [[p.x + p.w / 2, p.y + p.h / 2], [p.x + p.w / 2, p.y + 4]];
   for (const [px, py] of pts) {
@@ -3770,13 +3782,23 @@ function killGuard(g) {
   toast(left ? `처치 · 남은 경비 ${left}` : "모든 경비 처치");
 }
 function detected(g) {
-  if (mode !== "play") return;
+  if (mode !== "play" || L.player.invul > 0) return;
   g.alert = 1;
   sfx.alert();
   die("발각되었다");
 }
 function die(reason) {
   if (mode !== "play") return;
+  const fell = reason === "추락했다";
+  if (!fell && L.player.invul > 0) return;
+  if (!fell && L.player.shield) {
+    const q = L.player;
+    q.shield = false; q.invul = 1.5; q.vy = -480;
+    for (const g of L.guards) g.seeT = 0;
+    burst(q.x + q.w / 2, q.y + q.h / 2, 18, "#ffd47a", 200);
+    sfx.key(); buzz(25); toast("부적이 막아 주었다");
+    return;
+  }
   mode = "dead"; deadT = 0; runDeaths++; if (run) run.deaths++;
   const p = L.player;
   burst(p.x + p.w / 2, p.y + p.h / 2, 26, "#0d0d12", 260);
@@ -3808,6 +3830,15 @@ function updateWorld(dt) {
     if (tileAt(tx, ty) === "^" && overlap(p, { x: tx * TS + 4, y: ty * TS + 16, w: TS - 8, h: TS - 16 })) { die("가시에 찔렸다"); return; }
   if (p.y > L.H * TS + 60) { die("추락했다"); return; }
 
+  // power-ups
+  for (const pw of L.powers) if (!pw.taken && Math.hypot(p.x + p.w / 2 - pw.x, p.y + p.h / 2 - pw.y) < 24) {
+    pw.taken = true; sfx.key(); buzz(15);
+    burst(pw.x, pw.y, 16, POWER[pw.kind].color, 160);
+    if (pw.kind === "*") p.cloak = 8;
+    if (pw.kind === "+") { p.boots = 12; p.airJump = true; }
+    if (pw.kind === "$") p.shield = true;
+    toast(POWER[pw.kind].name + " · " + POWER[pw.kind].desc);
+  }
   // checkpoint flags
   for (const f of L.flags) if (!f.on && overlap(p, { x: f.tx * TS + 6, y: f.ty * TS - 16, w: 20, h: 48 })) {
     for (const o of L.flags) o.on = false;
@@ -3938,9 +3969,15 @@ function keepAwake(on) {
   } catch (e) {}
 }
 // Dying after a checkpoint keeps the world (keys, doors, defeated guards) and only moves you back.
+const POWER = {
+  "*": { name: "그림자 망토", desc: "8초 투명", color: "#b48cf0" },
+  "+": { name: "바람 신발", desc: "12초 2단 점프", color: "#9fe0ff" },
+  "$": { name: "수호 부적", desc: "1회 보호", color: "#ffd47a" },
+};
 function respawnAtCheckpoint() {
   const p = L.player, c = L.checkpoint;
-  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true });
+  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: false, invul: 0 });
+  for (const pw of L.powers) pw.taken = false;
   for (const k of p.scarf) { k.x = p.x + p.w / 2; k.y = p.y + 8; }
   Object.assign(L.hook, { state: "idle", crate: null });
   for (const g of L.guards) { g.seeT = 0; g.alert = 0; }
@@ -4144,6 +4181,10 @@ function updateHUD() {
   }
   if (L.plates.length) chips.push([`발판 ${L.plates.filter((q) => q.pressed).length}/${L.plates.length}`, L.plateOpen]);
   if (L.guards.length) { const dead = L.guards.filter((g) => !g.alive).length; chips.push([`경비 처치 ${dead}/${L.guards.length}`, dead === L.guards.length]); }
+  const q = L.player;
+  if (q.cloak > 0) chips.push([`망토 ${Math.ceil(q.cloak)}`, true]);
+  if (q.boots > 0) chips.push([`신발 ${Math.ceil(q.boots)}`, true]);
+  if (q.shield) chips.push(["부적", true]);
   const html = chips.map(([t, d]) => `<span class="chip${d ? " done" : ""}">${t}</span>`).join("");
   if (html !== hudCache) { $("hChips").innerHTML = html; hudCache = html; }
 }
@@ -4488,9 +4529,36 @@ function drawRope() {
   ctx.restore();
 }
 
+function drawPowers(t) {
+  for (const pw of L.powers) {
+    if (pw.taken) continue;
+    const c = POWER[pw.kind].color, y = pw.y + Math.sin(t * 3 + pw.x) * 3;
+    const gl = ctx.createRadialGradient(pw.x, y, 2, pw.x, y, 22);
+    gl.addColorStop(0, c); gl.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.globalAlpha = 0.55; ctx.fillStyle = gl; ctx.fillRect(pw.x - 22, y - 22, 44, 44); ctx.globalAlpha = 1;
+    ctx.fillStyle = c; ctx.strokeStyle = "#0b0d1a"; ctx.lineWidth = 1.5;
+    if (pw.kind === "*") { // cloak: hooded triangle
+      ctx.beginPath(); ctx.moveTo(pw.x, y - 9); ctx.lineTo(pw.x + 8, y + 8); ctx.lineTo(pw.x - 8, y + 8); ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (pw.kind === "+") { // boots: wing
+      ctx.beginPath(); ctx.moveTo(pw.x - 8, y + 6); ctx.quadraticCurveTo(pw.x - 2, y - 10, pw.x + 9, y - 6); ctx.quadraticCurveTo(pw.x + 2, y, pw.x + 4, y + 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else { // charm: diamond
+      ctx.beginPath(); ctx.moveTo(pw.x, y - 9); ctx.lineTo(pw.x + 7, y); ctx.lineTo(pw.x, y + 9); ctx.lineTo(pw.x - 7, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  }
+}
 function drawPlayer(t) {
   if (mode === "dead") return;
   const p = L.player, cx = p.x + p.w / 2;
+  // power-up auras
+  const auras = [];
+  if (p.cloak > 0) auras.push(POWER["*"].color);
+  if (p.boots > 0) auras.push(POWER["+"].color);
+  if (p.shield || p.invul > 0) auras.push(POWER["$"].color);
+  auras.forEach((c, k) => {
+    ctx.strokeStyle = c; ctx.globalAlpha = 0.5 + 0.2 * Math.sin(t * 6 + k); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(cx, p.y + p.h / 2, 16 + k * 4, 20 + k * 4, 0, 0, Math.PI * 2); ctx.stroke();
+  });
+  ctx.globalAlpha = p.cloak > 0 ? 0.45 : p.invul > 0 && Math.floor(t * 12) % 2 ? 0.4 : 1;
   // scarf
   ctx.strokeStyle = "#c8423b"; ctx.lineWidth = 3; ctx.lineCap = "round";
   ctx.beginPath(); ctx.moveTo(p.scarf[0].x, p.scarf[0].y);
@@ -4513,6 +4581,7 @@ function drawPlayer(t) {
   ctx.fillStyle = "#ece4cf"; ctx.fillRect(cx - 2 + p.face * 2, p.y + 4, 6, 2);
   // belt
   ctx.fillStyle = "#c8423b"; ctx.fillRect(p.x + 1, p.y + 18, p.w - 2, 2);
+  ctx.globalAlpha = 1;
 }
 
 function drawAim() {
@@ -4564,6 +4633,7 @@ function render(t) {
     ctx.drawImage(L.layer, 0, 0, L.W * TS, L.H * TS);
     drawDynamicTiles(t);
     drawFlags(t);
+    drawPowers(t);
     drawKeys(t);
     drawCrates();
     drawGuards(t);
