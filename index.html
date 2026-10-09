@@ -334,11 +334,22 @@
 // ---------- constants ----------
 const TS = 32, VW = 960, VH = 540;
 const GRAV = 1700, MAXFALL = 860, RUN = 220, ACC_G = 2600, ACC_A = 1700, JUMP = 520;
-const HOOK_SPEED = 2100, HOOK_RANGE = 384, REEL = 280, ROPE_MIN = 22, ROPE_MAX = 420;
+const HOOK_SPEED = 2100, REEL = 280, ROPE_MIN = 22;
+let HOOK_RANGE = 384, ROPE_MAX = 420; // scaled by the 청록 scarf
 const SWING_ACC = 1150, PULL_SPEED = 430;
 const SPRING = 930, WIND_UP = 300, WIND_ACC = 2600;
 const VIS_HALF = 0.48;
 // Difficulty-dependent tuning; applyDifficulty() sets these for normal or hard mode.
+// Each scarf carries one small ability; unlocked by total stars.
+const SKINS = [
+  { name: "붉은 스카프", need: 0, color: "#c8423b", desc: "발판 끝 점프 여유 +60%", coyote: 1.6 },
+  { name: "청록 스카프", need: 30, color: "#3fa7a0", desc: "갈고리 사거리 +25%", hook: 1.25 },
+  { name: "금빛 스카프", need: 90, color: "#e0b04a", desc: "금화·열쇠·파워업 자석", magnet: 34 },
+  { name: "보랏빛 스카프", need: 180, color: "#a77ae8", desc: "파워업 지속 +60%", power: 1.6 },
+  { name: "달빛 스카프", need: 300, color: "#e8e4f0", desc: "경비 시야 거리 -20%", vis: 0.8 },
+  { name: "무지개 스카프", need: 450, color: "rainbow", desc: "출발할 때마다 수호 부적 1회", shield: true },
+];
+const skin = () => SKINS[save.skin || 0] || SKINS[0];
 let VIS = 210, SEE_LIMIT = 0.45, CRACK_T = 1.6, REGROW_T = 4, PATROL_V = 55, WATCH_T = 2.6;
 const PW = 18, PH = 28;
 const STEP = 1 / 120;
@@ -4871,7 +4882,9 @@ const DIFF_NAME = ["일반", "하드", "마스터"];
 const bestTable = () => [save.best, save.bestH, save.bestM][diff];
 const srTable = () => [save.sr, save.srH, save.srM][diff];
 function applyDifficulty() {
-  VIS = [210, 270, 300][diff];
+  const sk = skin();
+  VIS = [210, 270, 300][diff] * (sk.vis || 1);
+  HOOK_RANGE = 384 * (sk.hook || 1); ROPE_MAX = 420 * (sk.hook || 1);
   SEE_LIMIT = [0.45, 0.2, 0.08][diff];
   CRACK_T = [1.6, 1.1, 0.75][diff];
   REGROW_T = [4, 6, 8][diff];
@@ -5369,7 +5382,7 @@ function updatePlayer(dt) {
   p.ground = onGround(p);
 
   if (jumpQueued) { p.jbuf = 0.18; jumpQueued = false; } else p.jbuf -= dt;
-  if (p.ground) p.coyote = 0.15; else p.coyote -= dt;
+  if (p.ground) p.coyote = 0.15 * (skin().coyote || 1); else p.coyote -= dt;
 
   if (p.ground) {
     // ice: slow to start, slow to stop
@@ -5608,7 +5621,7 @@ function updateWorld(dt) {
   if (p.y > L.H * TS + 60) { die("추락했다"); return; }
 
   // coins
-  for (const c of L.coins) if (!c.taken && Math.hypot(p.x + p.w / 2 - c.x, p.y + p.h / 2 - c.y) < 22) {
+  for (const c of L.coins) if (!c.taken && Math.hypot(p.x + p.w / 2 - c.x, p.y + p.h / 2 - c.y) < 22 + (skin().magnet || 0)) {
     c.taken = true; sfx.plate(); burst(c.x, c.y, 10, "#ffd47a", 120);
     const left = L.coins.filter((q) => !q.taken).length;
     toast(left ? `금화 ${L.coins.length - left}/${L.coins.length}` : "금화를 모두 모았다 · 출구가 열렸다");
@@ -5621,13 +5634,13 @@ function updateWorld(dt) {
     if (p.x + 4 < ch.x) { die("불길에 휩싸였다"); return; }
   }
   // power-ups
-  for (const pw of L.powers) if (!pw.taken && Math.hypot(p.x + p.w / 2 - pw.x, p.y + p.h / 2 - pw.y) < 24) {
+  for (const pw of L.powers) if (!pw.taken && Math.hypot(p.x + p.w / 2 - pw.x, p.y + p.h / 2 - pw.y) < 24 + (skin().magnet || 0)) {
     pw.taken = true; sfx.key(); buzz(15);
     burst(pw.x, pw.y, 16, POWER[pw.kind].color, 160);
-    if (pw.kind === "*") p.cloak = 8;
-    if (pw.kind === "+") { p.boots = 12; p.airJump = true; }
+    if (pw.kind === "*") p.cloak = 8 * (skin().power || 1);
+    if (pw.kind === "+") { p.boots = 12 * (skin().power || 1); p.airJump = true; }
     if (pw.kind === "$") p.shield = true;
-    toast(POWER[pw.kind].name + " · " + POWER[pw.kind].desc);
+    toast(POWER[pw.kind].name + " · " + (skin().power && pw.kind !== "$" ? POWER[pw.kind].desc.replace(/\d+초/, (m) => Math.round(parseInt(m) * skin().power) + "초") : POWER[pw.kind].desc));
   }
   // checkpoint flags
   for (const f of L.flags) if (!f.on && overlap(p, { x: f.tx * TS + 6, y: f.ty * TS - 16, w: 20, h: 48 })) {
@@ -5636,7 +5649,7 @@ function updateWorld(dt) {
     sfx.key(); toast("체크포인트"); burst(f.tx * TS + 16, f.ty * TS + 4, 12, "#7fd1c4", 120);
   }
   // keys
-  for (const k of L.keys) if (!k.taken && Math.hypot(p.x + p.w / 2 - k.x, p.y + p.h / 2 - k.y) < 22) {
+  for (const k of L.keys) if (!k.taken && Math.hypot(p.x + p.w / 2 - k.x, p.y + p.h / 2 - k.y) < 22 + (skin().magnet || 0)) {
     k.taken = true; p.keys++; burst(k.x, k.y, 14, "#e8c15a", 150); sfx.key(); toast("열쇠를 얻었다");
   }
   // doors
@@ -5717,6 +5730,7 @@ function updateParticles(dt) {
 function startLevel(i, keepStats) {
   cur = i;
   L = buildLevel(i);
+  if (skin().shield) L.player.shield = true;
   if (!keepStats) { runTime = 0; runDeaths = 0; showCard(); }
   mode = "play";
   jumpQueued = false;
@@ -5771,7 +5785,7 @@ const POWER = {
 };
 function respawnAtCheckpoint() {
   const p = L.player, c = L.checkpoint;
-  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: false, invul: 0 });
+  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0 });
   for (const pw of L.powers) pw.taken = false;
   if (L.chase) L.chase.x = c.x - 200;
   for (const k of p.scarf) { k.x = p.x + p.w / 2; k.y = p.y + 8; }
@@ -5854,7 +5868,7 @@ function win() {
   $("wStars").innerHTML = [0, 1, 2].map((k) => `<i class="${k < stars ? "on" : ""}">★</i>`).join("");
   $("wStarNote").textContent = `목표 ${parTime(cur)}초 · ${runDeaths ? "죽지 않고 깨면 별 하나 더" : "무사히 통과"}`;
   const unlocked = SKINS.filter((sk) => sk.need > beforeStars && sk.need <= totalStars());
-  if (unlocked.length) toast(`새 스카프 · ${unlocked.map((u) => u.name).join(", ")}`);
+  if (unlocked.length) toast(`새 스카프 · ${unlocked.map((u) => `${u.name}(${u.desc})`).join(", ")}`);
   $("bNext").innerHTML = last ? "<kbd>Enter</kbd> 메뉴로" : "<kbd>Enter</kbd> 다음 막";
   $("winBox").hidden = false; $("hud").hidden = true;
   syncTouchUI();
@@ -5928,7 +5942,7 @@ applyBig();
 $("bBig").addEventListener("click", () => { save.big = !save.big; writeSave(); applyBig(); });
 function applySkin() {
   const have = totalStars(), sk = SKINS[save.skin || 0];
-  $("bSkin").textContent = sk.name;
+  $("bSkin").textContent = sk.name + " · " + sk.desc;
   $("bSkin").style.color = sk.color === "rainbow" ? "" : sk.color;
   const next = SKINS.find((s2) => s2.need > have);
   $("starTotal").textContent = `모은 별 ★ ${have}` + (next ? ` · 다음 스카프(${next.name})까지 ${next.need - have}개` : " · 모든 스카프를 얻었다");
@@ -5937,7 +5951,7 @@ $("bSkin").addEventListener("click", () => {
   const have = totalStars();
   let k = save.skin || 0;
   do { k = (k + 1) % SKINS.length; } while (SKINS[k].need > have && k !== 0);
-  save.skin = k; writeSave(); applySkin();
+  save.skin = k; writeSave(); applySkin(); applyDifficulty();
 });
 function applyToggles() {
   for (const [id, key, label] of [["bLeft", "left", "왼손 모드"], ["bFade", "fade", "버튼 투명"], ["bVib", "vib", "진동"]]) {
@@ -6403,16 +6417,8 @@ function drawPowers(t) {
     }
   }
 }
-const SKINS = [
-  { name: "붉은 스카프", need: 0, color: "#c8423b" },
-  { name: "청록 스카프", need: 30, color: "#3fa7a0" },
-  { name: "금빛 스카프", need: 90, color: "#e0b04a" },
-  { name: "보랏빛 스카프", need: 180, color: "#a77ae8" },
-  { name: "달빛 스카프", need: 300, color: "#e8e4f0" },
-  { name: "무지개 스카프", need: 450, color: "rainbow" },
-];
 function skinColor(t) {
-  const sk = SKINS[save.skin || 0] || SKINS[0];
+  const sk = skin();
   return sk.color === "rainbow" ? `hsl(${(t * 90) % 360},80%,60%)` : sk.color;
 }
 function drawPlayer(t) {
