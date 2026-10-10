@@ -15,13 +15,14 @@ const SPRING = 930, WIND_UP = 300, WIND_ACC = 2600;
 const VIS_HALF = 0.48;
 // Difficulty-dependent tuning; applyDifficulty() sets these for normal or hard mode.
 // Each scarf carries one small ability; unlocked by total stars.
+// `theme` recolours the rope, hook, grab sparks and the menu accent to match the scarf.
 const SKINS = [
-  { name: "붉은 스카프", need: 0, color: "#c8423b", desc: "발판 끝 점프 여유 +60%", coyote: 1.6 },
-  { name: "청록 스카프", need: 30, color: "#3fa7a0", desc: "갈고리 사거리 +25%", hook: 1.25 },
-  { name: "금빛 스카프", need: 90, color: "#e0b04a", desc: "금화·열쇠·파워업 자석", magnet: 34 },
-  { name: "보랏빛 스카프", need: 180, color: "#a77ae8", desc: "파워업 지속 +60%", power: 1.6 },
-  { name: "달빛 스카프", need: 300, color: "#e8e4f0", desc: "경비 시야 거리 -20%", vis: 0.8 },
-  { name: "무지개 스카프", need: 450, color: "rainbow", desc: "출발할 때마다 수호 부적 1회", shield: true },
+  { name: "붉은 스카프", need: 0, color: "#c8423b", theme: { rope: "#e0785f", hook: "#f0c4b4", ui: "#e8846a" }, desc: "발판 끝 점프 여유 +60%", coyote: 1.6 },
+  { name: "청록 스카프", need: 30, color: "#3fa7a0", theme: { rope: "#4fc1b8", hook: "#bdf0ea", ui: "#5ccfc5" }, desc: "갈고리 사거리 +25%", hook: 1.25 },
+  { name: "금빛 스카프", need: 90, color: "#e0b04a", theme: { rope: "#e8c15a", hook: "#fff0b8", ui: "#ebc45e" }, desc: "금화·열쇠·파워업 자석", magnet: 34 },
+  { name: "보랏빛 스카프", need: 180, color: "#a77ae8", theme: { rope: "#b48cf0", hook: "#e4d4ff", ui: "#bf9cf4" }, desc: "파워업 지속 +60%", power: 1.6 },
+  { name: "달빛 스카프", need: 300, color: "#e8e4f0", theme: { rope: "#c9d3ea", hook: "#ffffff", ui: "#d4dcf0" }, desc: "경비 시야 거리 -20%", vis: 0.8 },
+  { name: "무지개 스카프", need: 450, color: "rainbow", theme: { rope: "rainbow", hook: "#ffffff", ui: "#f29ac4" }, desc: "출발할 때마다 수호 부적 1회", shield: true },
 ];
 const skin = () => SKINS[save.skin || 0] || SKINS[0];
 let VIS = 210, SEE_LIMIT = 0.45, CRACK_T = 1.6, REGROW_T = 4, PATROL_V = 55, WATCH_T = 2.6;
@@ -102,6 +103,7 @@ const bestTable = () => [save.best, save.bestH, save.bestM][diff];
 const srTable = () => [save.sr, save.srH, save.srM][diff];
 function applyDifficulty() {
   const sk = skin();
+  if (typeof document !== "undefined") document.documentElement.style.setProperty("--rope", sk.theme.ui);
   VIS = [210, 270, 300][diff] * (sk.vis || 1);
   HOOK_RANGE = 384 * (sk.hook || 1); ROPE_MAX = 420 * (sk.hook || 1);
   SEE_LIMIT = [0.38, 0.2, 0.08][diff];
@@ -484,7 +486,7 @@ function updateHook(dt) {
     if (d <= s + 6) h.state = "idle";
     else { h.x += dx / d * s; h.y += dy / d * s; }
   } else if (h.state === "attached") {
-    if (!segClear(o.x, o.y, h.ax, h.ay, 10, 7, false)) { h.state = "retract"; h.x = h.ax; h.y = h.ay; burst(h.ax, h.ay, 6, "#dca54a", 120); }
+    if (!segClear(o.x, o.y, h.ax, h.ay, 10, 7, false)) { h.state = "retract"; h.x = h.ax; h.y = h.ay; burst(h.ax, h.ay, 6, ropeColor(runTime), 120); }
   } else if (h.state === "pulling") {
     const c = h.crate;
     const cx = c.x + c.w / 2, cy = c.y + c.h / 2;
@@ -510,7 +512,7 @@ function onHookHit(hit) {
     if (tileAt(hit.tx, hit.ty) === "C") { const k = hit.tx + "," + hit.ty; if (!(k in L.crack)) L.crack[k] = CRACK_T; }
     h.len = clamp(Math.hypot(o.x - ax, o.y - ay), ROPE_MIN, ROPE_MAX);
     bump("hooks");
-    burst(ax, ay, 5, "#e8c88a", 90);
+    burst(ax, ay, 5, ropeColor(runTime), 90);
     sfx.attach();
   } else if (hit.kind === "switch") {
     L.flip = !L.flip;
@@ -1590,11 +1592,11 @@ function drawGuards(t) {
   }
 }
 
-function drawRope() {
+function drawRope(t) {
   const h = L.hook; if (h.state === "idle") return;
   const o = handPos();
   const hx = h.state === "attached" ? h.ax : h.x, hy = h.state === "attached" ? h.ay : h.y;
-  ctx.strokeStyle = "#dca54a"; ctx.lineWidth = 1.8;
+  ctx.strokeStyle = ropeColor(t); ctx.lineWidth = 1.8;
   ctx.beginPath(); ctx.moveTo(o.x, o.y);
   if (h.state === "attached") {
     const d = Math.hypot(hx - o.x, hy - o.y);
@@ -1605,7 +1607,7 @@ function drawRope() {
   // hook head
   let ang = Math.atan2(hy - o.y, hx - o.x);
   ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang);
-  ctx.fillStyle = "#c9ced8"; ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-5, -3.5); ctx.lineTo(-3, 0); ctx.lineTo(-5, 3.5); ctx.fill();
+  ctx.fillStyle = skin().theme.hook; ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-5, -3.5); ctx.lineTo(-3, 0); ctx.lineTo(-5, 3.5); ctx.fill();
   ctx.restore();
 }
 
@@ -1629,6 +1631,10 @@ function drawPowers(t) {
 function skinColor(t) {
   const sk = skin();
   return sk.color === "rainbow" ? `hsl(${(t * 90) % 360},80%,60%)` : sk.color;
+}
+function ropeColor(t) {
+  const r = skin().theme.rope;
+  return r === "rainbow" ? `hsl(${(t * 90 + 180) % 360},75%,65%)` : r;
 }
 function drawPlayer(t) {
   if (mode === "dead") return;
@@ -1694,7 +1700,7 @@ function drawAim() {
   let col = "rgba(236,228,207,0.25)", ok = false;
   if (a.hit) {
     const k = a.hit.kind;
-    if (k === "anchor" || k === "switch" || k === "crate" || (k === "guard" && a.hit.back)) { col = "rgba(220,165,74,0.9)"; ok = true; }
+    if (k === "anchor" || k === "switch" || k === "crate" || (k === "guard" && a.hit.back)) { col = ropeColor(runTime); ok = true; }
     else if (k === "guard") col = "rgba(208,88,63,0.9)";
     else col = "rgba(125,141,176,0.7)";
   }
@@ -1756,7 +1762,7 @@ function render(t) {
     drawKeys(t);
     drawCrates();
     drawGuards(t);
-    drawRope();
+    drawRope(t);
     drawGhost(t);
     drawPlayer(t);
     drawParticles();
