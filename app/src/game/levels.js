@@ -6234,7 +6234,7 @@ export const LEVELS = [
   {
     name: "근위대장의 방",
     goal: "망토가 사라지기 전에 순찰병 둘을 지나치며 쓰러뜨리고 성벽 위 근위대장에게 닿아라",
-    hint: "망토를 쓰면 8초 동안 보이지 않고 닿기만 해도 쓰러뜨린다. 순찰병 사이를 멈추지 말고 달려, 성벽 둘을 줄로 타고 오르라.",
+    hint: "망토를 쓰면 8초 동안 보이지 않고 닿기만 해도 쓰러뜨린다. 순찰병 사이를 멈추지 말고 달려라. 첫 성벽 위에 망토가 하나 더 있다.",
     needsPower: true,
     map: [
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
@@ -6246,12 +6246,12 @@ export const LEVELS = [
       "X                               XXXXXXXXXXXXXX",
       "X                    ###        XXXXXXXXXXXXXX",
       "X                               XXXXXXXXXXXXXX",
-      "X                               XXXXXXXXXXXXXX",
+      "X                          *    XXXXXXXXXXXXXX",
       "X                       XXXXXXXXXXXXXXXXXXXXXX",
       "X                       XXXXXXXXXXXXXXXXXXXXXX",
       "X                       XXXXXXXXXXXXXXXXXXXXXX",
       "X                       XXXXXXXXXXXXXXXXXXXXXX",
-      "X P * !  T  ! !  T  !   XXXXXXXXXXXXXXXXXXXXXX",
+      "X P *    !  T  ! !  T  !XXXXXXXXXXXXXXXXXXXXXX",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
     ],
   },
