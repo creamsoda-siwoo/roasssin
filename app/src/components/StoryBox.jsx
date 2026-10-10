@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import * as game from "../game/engine.js";
 
 // A chapter of the story, its lines fading in one after another.
-export default function StoryBox({ shown, story }) {
+function StoryBox({ shown, story }) {
   const btnRef = useRef(null);
   useEffect(() => {
     if (!shown) return;
@@ -26,3 +26,6 @@ export default function StoryBox({ shown, story }) {
     </div>
   );
 }
+
+// Re-render only when this component's own props change, not on every HUD tick.
+export default memo(StoryBox);

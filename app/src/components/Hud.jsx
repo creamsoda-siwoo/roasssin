@@ -1,6 +1,7 @@
+import { memo } from "react";
 import * as game from "../game/engine.js";
 
-export default function Hud({ hud, shown }) {
+function Hud({ hud, shown }) {
   return (
     <div className="hud" id="hud" hidden={!shown}>
       <div className="hud-l">
@@ -23,3 +24,6 @@ export default function Hud({ hud, shown }) {
     </div>
   );
 }
+
+// Re-render only when this component's own props change, not on every HUD tick.
+export default memo(Hud);

@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import * as game from "../game/engine.js";
 
-export default function WinBox({ shown, win }) {
+function WinBox({ shown, win }) {
   const nextRef = useRef(null);
   useEffect(() => {
     if (!shown) return;
@@ -31,3 +31,6 @@ export default function WinBox({ shown, win }) {
     </div>
   );
 }
+
+// Re-render only when this component's own props change, not on every HUD tick.
+export default memo(WinBox);

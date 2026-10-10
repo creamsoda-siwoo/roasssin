@@ -118,12 +118,14 @@ applyDifficulty();
 
 // ---------- canvas ----------
 let cv = null, ctx = null;
+// Lowered step by step on devices that cannot keep up, trading sharpness for a steady frame rate.
+let dprCap = 2, slowFrames = 0, sampleFrames = 0;
 let dpr = 1, scale = 1, viewW = VW, viewH = VH;
 let touchMode = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches);
 let touchAim = null;
 function resize() {
   if (!cv) return;
-  dpr = Math.min(touchMode ? 1.75 : 2, window.devicePixelRatio || 1);
+  dpr = Math.min(touchMode ? 1.75 : 2, dprCap, window.devicePixelRatio || 1);
   const w = window.innerWidth, h = window.innerHeight;
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
   // Phones get a closer camera; in portrait the base is square so the world is not shrunk to a sliver.
@@ -307,7 +309,10 @@ function buildLevel(i) {
   for (let k = 0; k < 8; k++) st.player.scarf.push({ x: st.start.x + PW / 2, y: st.start.y + 8 });
   st.hook = { state: "idle", x: 0, y: 0, dx: 0, dy: 0, dist: 0, ax: 0, ay: 0, len: 0, crate: null };
   st.sky = makeSky(i, W);
-  st.layer = prerender(st);
+  // the prerendered map only holds tiles that never change, so a retry reuses it instead of repainting
+  const R = touchMode ? 1.5 : 2;
+  if (!layerCache || layerCache.i !== i || layerCache.R !== R) layerCache = { i, R, c: prerender(st, R) };
+  st.layer = layerCache.c;
   return st;
 }
 
@@ -1269,8 +1274,8 @@ function makeSky(i, W) {
   return { stars, roofs };
 }
 
-function prerender(st) {
-  const R = touchMode ? 1.5 : 2;
+let layerCache = null;
+function prerender(st, R) {
   const c = document.createElement("canvas");
   c.width = st.W * TS * R; c.height = st.H * TS * R;
   const g = c.getContext("2d");
@@ -1312,12 +1317,28 @@ function prerender(st) {
   return c;
 }
 
+// Full-screen gradients are expensive to rasterise every frame on phones, so they are painted once per
+// screen size into an offscreen canvas and blitted.
+const bgCache = {};
+function cachedLayer(key, paint) {
+  const w = cv.width, h = cv.height, id = key + ":" + w + "x" + h;
+  let c = bgCache[id];
+  if (!c) {
+    for (const k in bgCache) if (k.startsWith(key + ":")) delete bgCache[k];
+    c = bgCache[id] = document.createElement("canvas");
+    c.width = w; c.height = h;
+    paint(c.getContext("2d"), w, h);
+  }
+  return c;
+}
 function drawSky(t) {
   const w = cv.width / dpr, h = cv.height / dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const gr = ctx.createLinearGradient(0, 0, 0, h);
-  gr.addColorStop(0, "#080a17"); gr.addColorStop(0.6, "#141733"); gr.addColorStop(1, "#2a1f3d");
-  ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(cachedLayer("sky", (g, W, H) => {
+    const gr = g.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, "#080a17"); gr.addColorStop(0.6, "#141733"); gr.addColorStop(1, "#2a1f3d");
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  }), 0, 0, w, h);
   const sky = L ? L.sky : menuSky;
   for (const s of sky.stars) {
     ctx.globalAlpha = 0.35 + 0.35 * Math.sin(t * 1.3 + s.tw);
@@ -1702,10 +1723,12 @@ function drawVignette() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const inGame = L && mode !== "menu";
   const hv = hard && inGame;
-  const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * (hv ? 0.2 : 0.35), w / 2, h / 2, Math.max(w, h) * (hv ? 0.62 : 0.75));
-  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, hv ? "rgba(20,0,0,0.88)" : "rgba(0,0,0,0.55)");
-  ctx.fillStyle = v; ctx.fillRect(0, 0, w, h);
-  if (hv) { ctx.fillStyle = "rgba(120,20,30,0.08)"; ctx.fillRect(0, 0, w, h); }
+  ctx.drawImage(cachedLayer(hv ? "vigH" : "vig", (g, W, H) => {
+    const v = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * (hv ? 0.2 : 0.35), W / 2, H / 2, Math.max(W, H) * (hv ? 0.62 : 0.75));
+    v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, hv ? "rgba(20,0,0,0.88)" : "rgba(0,0,0,0.55)");
+    g.fillStyle = v; g.fillRect(0, 0, W, H);
+    if (hv) { g.fillStyle = "rgba(120,20,30,0.08)"; g.fillRect(0, 0, W, H); }
+  }), 0, 0, w, h);
   if ((master || (daily && daily.mod === 3)) && inGame && L.player) {
     const p = L.player, px = (p.x + p.w / 2 - cam.x) * scale, py = (p.y + p.h / 2 - cam.y) * scale;
     const r = TS * scale;
@@ -1721,7 +1744,11 @@ function render(t) {
   drawSky(t);
   if (L) {
     worldTransform();
-    ctx.drawImage(L.layer, 0, 0, L.W * TS, L.H * TS);
+    // blit only the part of the prerendered map that is on screen; long maps are thousands of pixels wide
+    const R = L.layer.width / (L.W * TS);
+    const x0 = Math.max(0, Math.floor(cam.x)), y0 = Math.max(0, Math.floor(cam.y));
+    const x1 = Math.min(L.W * TS, Math.ceil(cam.x + viewW) + 1), y1 = Math.min(L.H * TS, Math.ceil(cam.y + viewH) + 1);
+    if (x1 > x0 && y1 > y0) ctx.drawImage(L.layer, x0 * R, y0 * R, (x1 - x0) * R, (y1 - y0) * R, x0, y0, x1 - x0, y1 - y0);
     drawDynamicTiles(t);
     drawFlags(t);
     drawCoins(t);
@@ -1761,7 +1788,16 @@ function step(dt) {
 }
 let last = performance.now(), acc = 0;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const raw = (now - last) / 1000;
+  const dt = Math.min(0.05, raw); last = now;
+  // adaptive resolution: if more than a third of recent play frames ran under ~40 fps, render fewer pixels
+  if (mode === "play" && raw < 0.5) {
+    sampleFrames++; if (raw > 1 / 40) slowFrames++;
+    if (sampleFrames >= 120) {
+      if (slowFrames > 40 && dpr > 1) { dprCap = Math.max(1, dpr - 0.25); resize(); }
+      sampleFrames = slowFrames = 0;
+    }
+  }
   if (L && (mode === "play" || mode === "dead")) {
     acc += dt;
     while (acc >= STEP) { step(STEP); acc -= STEP; }

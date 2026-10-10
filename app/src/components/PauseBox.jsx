@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import * as game from "../game/engine.js";
 
-export default function PauseBox({ shown, act }) {
+function PauseBox({ shown, act }) {
   const resumeRef = useRef(null);
   useEffect(() => {
     if (!shown) return;
@@ -22,3 +22,6 @@ export default function PauseBox({ shown, act }) {
     </div>
   );
 }
+
+// Re-render only when this component's own props change, not on every HUD tick.
+export default memo(PauseBox);

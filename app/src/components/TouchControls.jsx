@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 import * as game from "../game/engine.js";
 
 // Fixed stick on one side, jump and release buttons on the other.
 // The knob moves through a ref so dragging never re-renders React.
-export default function TouchControls({ shown, reset }) {
+function TouchControls({ shown, reset }) {
   const stickRef = useRef(null), knobRef = useRef(null), stickId = useRef(null);
   const [on, setOn] = useState({ jump: false, release: false });
 
@@ -62,3 +62,6 @@ export default function TouchControls({ shown, reset }) {
     </div>
   );
 }
+
+// Re-render only when this component's own props change, not on every HUD tick.
+export default memo(TouchControls);

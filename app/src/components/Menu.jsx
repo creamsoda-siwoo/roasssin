@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, memo } from "react";
 import * as game from "../game/engine.js";
 
 const onOff = (on) => (on ? " 켬" : " 끔");
@@ -22,7 +22,7 @@ function LevelTile({ lv }) {
   );
 }
 
-export default function Menu({ info, shown, touch, muted, install }) {
+function Menu({ info, shown, touch, muted, install }) {
   // bring the latest unlocked stage into view so long lists don't need scrolling
   useEffect(() => {
     if (!shown || !touch || info.next <= 12) return;
@@ -150,3 +150,6 @@ function PowerHelp() {
     </>
   );
 }
+
+// Re-render only when this component's own props change, not on every HUD tick.
+export default memo(Menu);
