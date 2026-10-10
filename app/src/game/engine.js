@@ -1141,6 +1141,13 @@ export function menuInfo() {
       const v = Math.min(a.val(), a.goal);
       return { id: a.id, name: a.name, desc: a.desc, done: !!save.ach[a.id], pct: Math.round((v / a.goal) * 100), prog: a.goal > 1 ? `${v}/${a.goal}` : "" };
     }),
+    chapters: CHAPTERS.map((c, k) => {
+      const a = c.from, b = Math.min(LEVELS.length, k + 1 < CHAPTERS.length ? CHAPTERS[k + 1].from : LEVELS.length);
+      let clear = 0, stars = 0;
+      for (let i = a; i < b; i++) { const r = bestTable()[i]; if (r) { clear++; stars += r.stars || 1; } }
+      return { k, a, b, title: c.title, clear, stars, locked: a >= save.unlocked };
+    }),
+    stats: playStats(),
     story: CHAPTERS.map((c, k) => ({ key: k, label: `제${k + 1}장 · ${c.title}`, open: save.unlocked > c.from }))
       .concat([{ key: "end", label: "에필로그 · " + EPILOGUE.title, open: !!save.story.end || !!save.best[LEVELS.length - 1] }]),
     segments: SEGMENTS.map(([a, b], idx) => {
@@ -1152,6 +1159,25 @@ export function menuInfo() {
       };
     }),
   };
+}
+function fmtPlayTime(sec) {
+  const m = Math.floor(sec / 60), h = Math.floor(m / 60);
+  return h ? `${h}시간 ${m % 60}분` : m ? `${m}분 ${Math.floor(sec % 60)}초` : `${Math.floor(sec)}초`;
+}
+function playStats() {
+  const st = save.stats, n = (k) => (st[k] || 0).toLocaleString("ko-KR");
+  const cleared = LEVELS.filter((_, i) => bestTable()[i]).length;
+  return [
+    ["플레이 시간", fmtPlayTime(st.time || 0)],
+    ["깬 막 (" + DIFF_NAME[diff] + ")", `${cleared} / ${LEVELS.length}`],
+    ["모은 별", String(totalStars())],
+    ["줄을 건 횟수", n("hooks")],
+    ["쓰러뜨린 경비", n("kills")],
+    ["주운 금화", n("coins")],
+    ["쓰러진 횟수", n("deaths")],
+    ["무사고 연속 최고", n("cleanBest") + "막"],
+    ["오늘의 도전 연속", (save.streak || 0) + "일"],
+  ];
 }
 export function playLevel(i) { ensureAudio(); beginLevel(i); }
 export function playContinue() { ensureAudio(); beginLevel(Math.min(LEVELS.length, save.unlocked) - 1); }
@@ -1777,6 +1803,7 @@ function step(dt) {
   if (run && !run.done && (mode === "play" || mode === "dead")) run.t += dt;
   if (mode === "play") {
     runTime += dt;
+    save.stats.time = (save.stats.time || 0) + dt; // saved with the next death or clear
     while (ghostRec.length / 2 < runTime * GHOST_HZ) ghostRec.push(Math.round(L.player.x), Math.round(L.player.y));
     updatePlayer(dt);
     updateHook(dt);

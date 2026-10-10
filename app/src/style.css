@@ -189,3 +189,17 @@ body.touch .hud-l { max-width: calc(100vw - 340px - env(safe-area-inset-left, 0p
 @keyframes storyIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .storylines p { animation: none; opacity: 1; } }
 #storyList { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+
+/* chapter tabs above the stage list, one chapter of stages at a time */
+.chaptabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.chtab { flex: 0 0 auto; display: grid; gap: 1px; min-width: 52px; padding: 6px 8px; text-align: center; }
+.chtab b { font-family: var(--display); font-size: 15px; font-weight: 400; }
+.chtab small { font-size: 10px; color: var(--paper-dim); font-variant-numeric: tabular-nums; }
+.chtab.on { border-color: var(--rope); color: var(--rope); }
+.chtab.done:not(.on) b { color: #ffd47a; }
+.chaphead { margin: 0; font-family: var(--display); font-size: 18px; color: var(--rope); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.chaphead span { font-family: var(--body); font-size: 12px; color: var(--paper-dim); font-variant-numeric: tabular-nums; }
+.statgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 0; }
+.statgrid div { padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.statgrid dt { font-size: 11px; color: var(--paper-dim); }
+.statgrid dd { margin: 2px 0 0; font-family: var(--display); font-size: 20px; color: var(--paper); font-variant-numeric: tabular-nums; }

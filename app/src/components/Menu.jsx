@@ -1,4 +1,4 @@
-import { useEffect, memo } from "react";
+import { useEffect, useState, memo } from "react";
 import * as game from "../game/engine.js";
 
 const onOff = (on) => (on ? " 켬" : " 끔");
@@ -22,14 +22,21 @@ function LevelTile({ lv }) {
   );
 }
 
+// Chapter holding the latest unlocked stage.
+const chapterOf = (info) => Math.max(0, info.chapters.findIndex((c) => info.next - 1 >= c.a && info.next - 1 < c.b));
+
 function Menu({ info, shown, touch, muted, install }) {
-  // bring the latest unlocked stage into view so long lists don't need scrolling
+  // the stage list shows one chapter at a time (-1 = every stage); reopen on the current chapter
+  const [chap, setChap] = useState(() => chapterOf(info));
+  useEffect(() => { if (shown) setChap(chapterOf(info)); }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  // keep the selected chapter tab in view in the scrolling tab row
   useEffect(() => {
-    if (!shown || !touch || info.next <= 12) return;
-    const el = document.getElementById("lv" + (info.next - 1));
-    const id = requestAnimationFrame(() => { try { el.scrollIntoView({ block: "center" }); } catch (e) {} });
+    if (!shown) return;
+    const el = document.getElementById("ch" + chap);
+    const id = requestAnimationFrame(() => { try { el.scrollIntoView({ block: "nearest", inline: "center" }); } catch (e) {} });
     return () => cancelAnimationFrame(id);
-  }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shown, chap]);
+  const shownLevels = chap < 0 ? info.levels : info.levels.slice(info.chapters[chap].a, info.chapters[chap].b);
 
   return (
     <div className="overlay" id="menu" hidden={!shown}>
@@ -80,8 +87,26 @@ function Menu({ info, shown, touch, muted, install }) {
             <li>기록은 일반 모드와 따로 남는다</li>
           </ul>
         </div>
+        <div className="chaptabs" id="chapTabs" role="tablist" aria-label="장 고르기">
+          <button type="button" role="tab" id="ch-1" aria-selected={chap < 0} className={"chtab all" + (chap < 0 ? " on" : "")} onClick={() => setChap(-1)}>
+            <b>전체</b><small>{info.levels.length}막</small>
+          </button>
+          {info.chapters.map((c) => (
+            <button key={c.k} type="button" role="tab" id={"ch" + c.k} aria-selected={chap === c.k} disabled={c.locked}
+              className={"chtab" + (chap === c.k ? " on" : "") + (c.clear === c.b - c.a ? " done" : "")}
+              title={`제${c.k + 1}장 · ${c.title}`} onClick={() => setChap(c.k)}>
+              <b>{c.k + 1}장</b><small>{c.locked ? "🔒" : `★${c.stars}`}</small>
+            </button>
+          ))}
+        </div>
+        {chap >= 0 && (
+          <p className="chaphead" id="chapHead">
+            제{chap + 1}장 · {info.chapters[chap].title}
+            <span>{info.chapters[chap].a + 1}–{info.chapters[chap].b}막 · 깬 막 {info.chapters[chap].clear}/{info.chapters[chap].b - info.chapters[chap].a} · ★ {info.chapters[chap].stars}/{(info.chapters[chap].b - info.chapters[chap].a) * 3}</span>
+          </p>
+        )}
         <div className="levels" id="levelList">
-          {info.levels.map((lv) => <LevelTile key={lv.i} lv={lv} />)}
+          {shownLevels.map((lv) => <LevelTile key={lv.i} lv={lv} />)}
         </div>
         <details className="fold sr">
           <summary id="srTitle">{info.srTitle}</summary>
@@ -115,6 +140,12 @@ function Menu({ info, shown, touch, muted, install }) {
               </div>
             ))}
           </div>
+        </details>
+        <details className="fold">
+          <summary>기록</summary>
+          <dl className="statgrid" id="statList">
+            {info.stats.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+          </dl>
         </details>
         <details className="fold">
           <summary>조작법</summary>
