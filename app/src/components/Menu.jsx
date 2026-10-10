@@ -95,6 +95,16 @@ export default function Menu({ info, shown, touch, muted, install }) {
           </div>
         </details>
         <details className="fold">
+          <summary>이야기 {info.story.filter((c) => c.open).length}/{info.story.length}</summary>
+          <div className="srgrid" id="storyList">
+            {info.story.map((c) => (
+              <button key={c.key} type="button" className="srb" disabled={!c.open} onClick={() => game.readStory(c.key)}>
+                <b>{c.open ? c.label : "잠김"}</b>
+              </button>
+            ))}
+          </div>
+        </details>
+        <details className="fold">
           <summary>업적 {info.achievements.filter((a) => a.done).length}/{info.achievements.length}</summary>
           <div className="achgrid" id="achList">
             {info.achievements.map((a) => (

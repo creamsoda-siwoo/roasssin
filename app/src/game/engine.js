@@ -2,6 +2,7 @@
 // It owns the game loop; everything the UI shows is pushed to ./store.js and drawn by the React components.
 import { LEVELS, ACTS } from "./levels.js";
 import { getState, setState, update } from "./store.js";
+import { CHAPTERS, EPILOGUE, chapterAt } from "./story.js";
 
 // ---------- constants ----------
 const TS = 32, VW = 960, VH = 540;
@@ -35,9 +36,9 @@ const REBUILT = [43, 58, 66, 70, 92, 98, 107, 112, 113, 119, 121, 125, 126, 127,
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1 };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {} };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {} };
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
@@ -189,6 +190,8 @@ function onKeyDown(e) {
     // preventDefault keeps Enter from also "clicking" the focused overlay button
     if (e.code === "Escape" || e.code === "KeyP" || e.code === "Enter") { e.preventDefault(); resumeGame(); }
     if (e.code === "KeyR") { resumeGame(); restartLevel(); }
+  } else if (mode === "story") {
+    if (e.code === "Enter" || e.code === "Space" || e.code === "Escape") { e.preventDefault(); storyContinue(); }
   } else if (mode === "win" && !(run && !run.done)) {
     if (e.code === "Enter" || e.code === "Space") { e.preventDefault(); winNext(); }
     if (e.code === "KeyR") winRetry();
@@ -949,7 +952,33 @@ function respawnAtCheckpoint() {
   snapCamera();
 }
 function restartLevel() { if (L) startLevel(cur, true); }
-function nextLevel() { if (cur + 1 < LEVELS.length) startLevel(cur + 1, false); else showMenu(); }
+function nextLevel() {
+  if (cur + 1 < LEVELS.length) beginLevel(cur + 1);
+  else if (!save.story.end) showStory("end", null);
+  else showMenu();
+}
+// Normal play opens each chapter with its story the first time; speedruns and the daily challenge skip it.
+function beginLevel(i) {
+  const c = chapterAt(i);
+  if (c >= 0 && !save.story[c] && !run && !daily) showStory(c, () => startLevel(i, false));
+  else startLevel(i, false);
+}
+let storyThen = null, storyKey = null;
+function showStory(key, then) {
+  const ch = key === "end" ? EPILOGUE : CHAPTERS[key];
+  storyThen = then; storyKey = key;
+  setMode("story");
+  keepAwake(false);
+  update("story", { label: key === "end" ? "에필로그" : `제${key + 1}장`, title: ch.title, lines: ch.lines, n: (getState().story.n || 0) + 1 });
+  setState({ overlay: "story", hudShown: false });
+}
+export function storyContinue() {
+  if (mode !== "story") return;
+  if (!save.story[storyKey]) { save.story[storyKey] = true; writeSave(); }
+  const then = storyThen; storyThen = null;
+  if (then) then(); else showMenu();
+}
+export function readStory(key) { ensureAudio(); showStory(key, null); }
 // Speedrun: a range of stages played back to back on one in-game clock.
 let run = null;
 const SEGMENTS = [[0, LEVELS.length - 1]];
@@ -1105,6 +1134,8 @@ export function menuInfo() {
       const v = Math.min(a.val(), a.goal);
       return { id: a.id, name: a.name, desc: a.desc, done: !!save.ach[a.id], pct: Math.round((v / a.goal) * 100), prog: a.goal > 1 ? `${v}/${a.goal}` : "" };
     }),
+    story: CHAPTERS.map((c, k) => ({ key: k, label: `제${k + 1}장 · ${c.title}`, open: save.unlocked > c.from }))
+      .concat([{ key: "end", label: "에필로그 · " + EPILOGUE.title, open: !!save.story.end || !!save.best[LEVELS.length - 1] }]),
     segments: SEGMENTS.map(([a, b], idx) => {
       const locked = b >= save.unlocked, best = srTable()[segKey(a, b)];
       return {
@@ -1115,8 +1146,8 @@ export function menuInfo() {
     }),
   };
 }
-export function playLevel(i) { ensureAudio(); startLevel(i, false); }
-export function playContinue() { ensureAudio(); startLevel(Math.min(LEVELS.length, save.unlocked) - 1, false); }
+export function playLevel(i) { ensureAudio(); beginLevel(i); }
+export function playContinue() { ensureAudio(); beginLevel(Math.min(LEVELS.length, save.unlocked) - 1); }
 export function playDaily() { ensureAudio(); startDaily(); }
 export function playRun(a, b) { ensureAudio(); startRun(a, b); }
 export function soundClick() { ensureAudio(); toggleMute(); }

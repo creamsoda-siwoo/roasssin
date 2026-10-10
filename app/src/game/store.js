@@ -12,6 +12,7 @@ let state = {
   pause: { act: "" },
   win: { act: "", title: "", stars: null, starNote: "", time: "", deaths: 0, best: "", next: "다음 막", retry: "다시 하기", menuBtn: true },
   install: { shown: false, note: "", noteShown: false },
+  story: { label: "", title: "", lines: [], n: 0 },
   stickReset: 0,
 };
 const listeners = new Set();

@@ -183,3 +183,9 @@ body.touch .hud-l { max-width: calc(100vw - 340px - env(safe-area-inset-left, 0p
 .ach.done b { color: #ffd47a; }
 .ach .bar { height: 3px; border-radius: 2px; background: rgba(236, 228, 207, .12); overflow: hidden; }
 .ach .bar i { display: block; height: 100%; background: var(--rope); }
+.story h2 { font-family: var(--display); font-weight: 400; font-size: clamp(36px, 7vw, 64px); margin: 0; line-height: 1; }
+.storylines { display: grid; gap: 12px; max-width: 46ch; }
+.storylines p { margin: 0; line-height: 1.75; color: var(--paper); opacity: 0; animation: storyIn .8s ease forwards; }
+@keyframes storyIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .storylines p { animation: none; opacity: 1; } }
+#storyList { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
