@@ -51,6 +51,7 @@ function Menu({ info, shown, touch, muted, install }) {
           <button className="primary" id="bCont" type="button" onClick={game.playContinue}>{info.cont}</button>
           <button id="bDaily" type="button" onClick={game.playDaily}>{info.daily}</button>
           <button id="bHard" type="button" aria-pressed={String(info.hard)} className={info.master ? "master" : undefined} onClick={game.cycleDifficulty}>난이도 · {info.diffName}</button>
+          <button id="bBonus" type="button" className={"bonus" + (info.bonus.cleared ? " cleared" : "")} title="칠흑 · 불길 추격 · 썩은 들보 · 깃발 없음" onClick={game.playBonus}>{info.bonus.label}</button>
           <button id="bInstall" type="button" hidden={!install.shown} onClick={game.installClick}>앱 설치</button>
         </div>
         <details className="fold" id="settings">

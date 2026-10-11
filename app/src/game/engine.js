@@ -1,6 +1,7 @@
 // Game engine: physics, level logic and canvas rendering.
 // It owns the game loop; everything the UI shows is pushed to ./store.js and drawn by the React components.
 import { LEVELS, ACTS } from "./levels.js";
+import { BONUS } from "./bonus.js";
 import { getState, setState, update } from "./store.js";
 import { CHAPTERS, EPILOGUE, chapterAt } from "./story.js";
 
@@ -37,9 +38,9 @@ const REBUILT = [43, 58, 66, 70, 92, 98, 107, 112, 113, 119, 121, 125, 126, 127,
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {} };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {} };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {} };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {}, bonus: {} };
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
@@ -300,11 +301,15 @@ function hash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >
 
 // ---------- level state ----------
 let L = null, cur = 0, mode = "menu";
+// The bonus stage sits just past the campaign's last index so ghosts and the level flow can treat it like any stage.
+const BONUS_I = LEVELS.length;
+const lvAt = (i) => (i === BONUS_I ? BONUS : LEVELS[i]);
+const actAt = (i) => (i === BONUS_I ? "보너스" : ACTS[i]);
 let runTime = 0, runDeaths = 0, deadT = 0;
 const cam = { x: 0, y: 0 };
 
 function buildLevel(i) {
-  const def = LEVELS[i];
+  const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
   const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
@@ -931,8 +936,8 @@ function startLevel(i, keepStats) {
   keepAwake(true);
   fadeGoal();
   update("hud", {
-    act: ACTS[i] + " / " + LEVELS.length + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : ""),
-    hard, master, name: LEVELS[i].name, goal: LEVELS[i].goal,
+    act: (i === BONUS_I ? "보너스 · 초고난도" : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : ""),
+    hard, master, name: lvAt(i).name, goal: lvAt(i).goal,
   });
   syncHintText();
   snapCamera();
@@ -948,7 +953,7 @@ function pauseGame() {
   setMode("pause");
   for (const k in keys) keys[k] = false;
   resetTouch(); touchAim = null;
-  update("pause", { act: ACTS[cur] + " · " + LEVELS[cur].name + (run ? ` · 스피드런 ${run.t.toFixed(1)}초` : "") });
+  update("pause", { act: actAt(cur) + " · " + lvAt(cur).name + (run ? ` · 스피드런 ${run.t.toFixed(1)}초` : "") });
   setState({ overlay: "pause" });
 }
 function resumeGame() {
@@ -985,7 +990,8 @@ function respawnAtCheckpoint() {
 }
 function restartLevel() { if (L) startLevel(cur, true); }
 function nextLevel() {
-  if (cur + 1 < LEVELS.length) beginLevel(cur + 1);
+  if (cur === BONUS_I) showMenu();
+  else if (cur + 1 < LEVELS.length) beginLevel(cur + 1);
   else if (!save.story.end) showStory("end", null);
   else showMenu();
 }
@@ -1067,7 +1073,7 @@ function runStageCleared() {
 }
 // Stars: 1 for clearing, 1 for a deathless run, 1 for beating the target time.
 function parTime(i) {
-  const d = LEVELS[i], rows = d.map, t = rows.join("");
+  const d = lvAt(i), rows = d.map, t = rows.join("");
   const W = Math.max(...rows.map((r) => r.length)), H = rows.length;
   const count = (re) => (t.match(re) || []).length;
   return Math.round(8 + Math.max(W, H) * 0.32 + count(/[TYUV]/g) * 2.5 + count(/K/g) * 3 + count(/o/g) * 1.5 + count(/B/g) * 4 + count(/[S]/g) * 2);
@@ -1096,6 +1102,7 @@ const ACHIEVEMENTS = [
   { id: "d7", name: "꾸준한 수행", desc: "오늘의 도전을 7일 연속으로 깬다", goal: 7, val: () => save.streak || 0 },
   { id: "sr", name: "질주 본능", desc: "스피드런 구간 하나를 끝까지 달린다", goal: 1, val: () => clears(save.sr) + clears(save.srH) + clears(save.srM) },
   { id: "dd100", name: "끈질긴 자객", desc: "100번 쓰러지고도 다시 일어선다", goal: 100, val: () => save.stats.deaths || 0 },
+  { id: "abyss", name: "심연을 건넌 자", desc: "초고난도 보너스 스테이지를 깬다", goal: 1, val: () => Object.keys(save.bonus).length },
 ];
 function checkAchievements() {
   const fresh = ACHIEVEMENTS.filter((a) => !save.ach[a.id] && a.val() >= a.goal);
@@ -1111,6 +1118,7 @@ function win() {
   if (runDeaths === 0) { bump("clean"); save.stats.cleanBest = Math.max(save.stats.cleanBest || 0, save.stats.clean); }
   setTimeout(checkAchievements, 1400); // after the stage's own toasts
   if (daily) { dailyCleared(); return; }
+  if (cur === BONUS_I) { bonusCleared(); return; }
   const prev = bestTable()[cur];
   const stars = starsOf(cur, runTime, runDeaths);
   const rec = { time: runTime, deaths: runDeaths, stars: Math.max(stars, (prev && prev.stars) || 0) };
@@ -1130,6 +1138,20 @@ function win() {
     time: runTime.toFixed(1) + "초", deaths: runDeaths,
     best: (better ? runTime : prev.time).toFixed(1) + "초" + (better && prev ? " ★" : ""),
     next: last ? "메뉴로" : "다음 막", retry: "다시 하기", menuBtn: true,
+  });
+}
+// The bonus keeps one record per difficulty and never touches campaign progress or stars.
+function bonusCleared() {
+  const prev = save.bonus[diff], better = !prev || runTime < prev.time;
+  if (better) { save.bonus[diff] = { time: runTime, deaths: runDeaths }; storeGhost(BONUS_I, ghostRec); }
+  writeSave();
+  showWin({
+    act: "보너스 · " + BONUS.name + (hard ? " · " + DIFF_NAME[diff] : ""),
+    title: prev ? (better ? "심연의 신기록" : "심연을 건넜다") : "심연을 건넌 자",
+    stars: null, starNote: "초고난도 보너스 · 별 대신 이름이 남는다",
+    time: runTime.toFixed(1) + "초", deaths: runDeaths,
+    best: (better ? runTime : prev.time).toFixed(1) + "초" + (better && prev ? " ★" : ""),
+    next: "메뉴로", retry: "다시 도전", menuBtn: false,
   });
 }
 export function showMenu() {
@@ -1173,6 +1195,7 @@ export function menuInfo() {
       return { k, a, b, title: c.title, clear, stars, locked: a >= save.unlocked };
     }),
     stats: playStats(),
+    bonus: { label: "보너스 · 초고난도" + (save.bonus[diff] ? ` · 최고 ${save.bonus[diff].time.toFixed(1)}초` : ""), cleared: !!save.bonus[diff] },
     story: CHAPTERS.map((c, k) => ({ key: k, label: `제${k + 1}장 · ${c.title}`, open: save.unlocked > c.from }))
       .concat([{ key: "end", label: "에필로그 · " + EPILOGUE.title, open: !!save.story.end || !!save.best[LEVELS.length - 1] }]),
     segments: SEGMENTS.map(([a, b], idx) => {
@@ -1206,6 +1229,7 @@ function playStats() {
 }
 export function playLevel(i) { ensureAudio(); beginLevel(i); }
 export function playContinue() { ensureAudio(); beginLevel(Math.min(LEVELS.length, save.unlocked) - 1); }
+export function playBonus() { ensureAudio(); run = null; startLevel(BONUS_I, false); }
 export function playDaily() { ensureAudio(); startDaily(); }
 export function playRun(a, b) { ensureAudio(); startRun(a, b); }
 export function soundClick() { ensureAudio(); toggleMute(); }
@@ -1229,7 +1253,7 @@ export function hudNameTap() { showHint(); fadeGoal(); measurePads(); }
 
 function syncHintText() {
   if (!L) return;
-  const lv = LEVELS[cur];
+  const lv = lvAt(cur);
   update("hud", { hint: touchMode && lv.touchHint ? lv.touchHint : lv.hint });
 }
 let goalTimer = 0;
@@ -1256,7 +1280,7 @@ function toast(msg, bad) {
 }
 let cardTimer = 0;
 function showCard() {
-  update("card", { act: ACTS[cur], name: LEVELS[cur].name, show: true });
+  update("card", { act: actAt(cur), name: lvAt(cur).name, show: true });
   clearTimeout(cardTimer);
   cardTimer = setTimeout(() => update("card", { show: false }), 1500);
 }
@@ -1786,7 +1810,7 @@ function drawVignette() {
     g.fillStyle = v; g.fillRect(0, 0, W, H);
     if (hv) { g.fillStyle = "rgba(120,20,30,0.08)"; g.fillRect(0, 0, W, H); }
   }), 0, 0, w, h);
-  if ((master || (daily && daily.mod === 3)) && inGame && L.player) {
+  if ((master || (daily && daily.mod === 3) || lvAt(cur).dark) && inGame && L.player) {
     const p = L.player, px = (p.x + p.w / 2 - cam.x) * scale, py = (p.y + p.h / 2 - cam.y) * scale;
     const r = TS * scale;
     const lamp = ctx.createRadialGradient(px, py, r * 2.2, px, py, r * 6.5);

@@ -210,3 +210,8 @@ body.touch .hud-l { max-width: calc(100vw - 340px - env(safe-area-inset-left, 0p
 .xfercode:focus { outline: 2px solid var(--rope); outline-offset: 1px; }
 .xfermsg { margin: 0; font-size: 13px; color: var(--teal); }
 .xfermsg.bad { color: var(--vermilion); }
+
+/* the bonus stage button: a red, slightly ominous accent independent of the scarf colour */
+button.bonus { border-color: rgba(208, 88, 63, .7); color: #e8846a; }
+button.bonus:hover:not(:disabled) { border-color: #ff6a4a; color: #ff8a6a; }
+button.bonus.cleared { border-color: rgba(255, 212, 122, .7); color: #ffd47a; }
