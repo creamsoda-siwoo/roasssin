@@ -695,10 +695,12 @@ function updatePlayer(dt) {
   if (inWind && !ix && !hooked) p.vx = approach(p.vx, 0, 1400 * dt);
 
   // conveyor (> or <): standing on it carries you along on top of your own running
+  // and leaving it (by jumping or running off the end) keeps the belt's speed as momentum
   if (p.ground && !hooked) {
     const belt = tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h + 1) / TS));
-    if (belt === ">" || belt === "<") moveAxis(p, "x", (belt === ">" ? 1 : -1) * BELT_V * dt);
-  }
+    p.carry = belt === ">" ? BELT_V : belt === "<" ? -BELT_V : 0;
+    if (p.carry) moveAxis(p, "x", p.carry * dt);
+  } else if (p.carry) { p.vx += p.carry; p.carry = 0; }
   const fallV = p.vy;
   if (moveAxis(p, "x", p.vx * dt)) p.vx = 0;
   if (moveAxis(p, "y", p.vy * dt)) p.vy = 0;
@@ -1049,7 +1051,7 @@ const POWER = {
 };
 function respawnAtCheckpoint() {
   const p = L.player, c = L.checkpoint;
-  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0 });
+  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0, carry: 0 });
   for (const pw of L.powers) pw.taken = false;
   if (L.chase) L.chase.x = c.x - 200;
   for (const k of p.scarf) { k.x = p.x + p.w / 2; k.y = p.y + 8; }
