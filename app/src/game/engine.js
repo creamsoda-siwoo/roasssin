@@ -363,7 +363,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -372,6 +372,8 @@ function solidChar(c) {
 }
 const isSolid = (tx, ty) => solidChar(tileAt(tx, ty));
 
+// Crumbling floor (N): cracks FLOOR_CRACK seconds after you step on it, falls away, then regrows like a rotten beam.
+const FLOOR_CRACK = 0.45;
 // Flame vents (A): a grate in the floor that fires a column of flame up to VENT_H tiles high.
 // Each vent runs the same cycle shifted by its column, so a row of vents fires as a wave.
 const VENT_T = 2.8, VENT_ON = 1.1, VENT_WARN = 0.45, VENT_H = 3;
@@ -617,6 +619,12 @@ function updatePlayer(dt) {
   const ix = (right ? 1 : 0) - (left ? 1 : 0);
   const hooked = h.state === "attached";
   p.ground = onGround(p);
+  // crumbling floor (N): the slab under your feet starts to crack the moment you stand on it
+  if (p.ground) {
+    const ty = Math.floor((p.y + p.h + 1) / TS);
+    for (let tx = Math.floor(p.x / TS); tx <= Math.floor((p.x + p.w - 0.01) / TS); tx++)
+      if (tileAt(tx, ty) === "N") { const k = tx + "," + ty; if (!(k in L.crack)) { L.crack[k] = FLOOR_CRACK; sfx.crack(); } }
+  }
 
   if (jumpQueued) { p.jbuf = 0.18; jumpQueued = false; } else p.jbuf -= dt;
   if (p.ground) p.coyote = 0.15 * (skin().coyote || 1); else p.coyote -= dt;
@@ -941,8 +949,9 @@ function updateCrumble(dt) {
     if (L.crack[k] > 0) continue;
     delete L.crack[k];
     const [x, y] = k.split(",").map(Number);
-    L.grid[y][x] = "c"; L.regrow[k] = REGROW_T;
-    burst(x * TS + 16, y * TS + 16, 14, "#8b6a4c", 150);
+    const floor = L.grid[y][x] === "N";
+    L.grid[y][x] = floor ? "n" : "c"; L.regrow[k] = REGROW_T;
+    burst(x * TS + 16, y * TS + 16, 14, floor ? "#7d8db0" : "#8b6a4c", 150);
     sfx.crack();
     if (h.state === "attached" && h.tx === x && h.ty === y) { h.state = "retract"; h.x = h.ax; h.y = h.ay; }
   }
@@ -953,7 +962,7 @@ function updateCrumble(dt) {
     const r = { x: x * TS, y: y * TS, w: TS, h: TS };
     if (overlap(L.player, r) || L.crates.some((c) => overlap(c, r))) continue;
     delete L.regrow[k];
-    L.grid[y][x] = "C";
+    L.grid[y][x] = L.grid[y][x] === "n" ? "N" : "C";
   }
 }
 
@@ -1581,6 +1590,19 @@ function drawDynamicTiles(t) {
       ctx.moveTo(px + 24, py); ctx.lineTo(px + 20, py + 9); ctx.lineTo(px + 26, py + 18); ctx.stroke();
       ctx.fillStyle = "#9a7a58"; ctx.fillRect(px, py, TS, 2);
       ctx.restore();
+    } else if (ch === "N") {
+      const k = x + "," + y, cr = L.crack[k];
+      const sh = cr !== undefined ? (Math.random() - 0.5) * 2 * (1 - cr / FLOOR_CRACK) * 2 : 0;
+      ctx.save(); ctx.translate(0, sh);
+      ctx.fillStyle = "#2b3247"; ctx.fillRect(px, py, TS, TS);
+      ctx.fillStyle = "#3c4560"; ctx.fillRect(px + 1, py + 1, 14, 9); ctx.fillRect(px + 17, py + 1, 14, 9); ctx.fillRect(px + 8, py + 12, 16, 8);
+      ctx.strokeStyle = cr !== undefined ? "#e8c88a" : "#1a1f2e"; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(px + 9, py + 2); ctx.lineTo(px + 13, py + 11); ctx.lineTo(px + 10, py + 22); ctx.moveTo(px + 22, py + 4); ctx.lineTo(px + 19, py + 14); ctx.lineTo(px + 25, py + 26); ctx.stroke();
+      ctx.fillStyle = "#8a96b4"; ctx.fillRect(px, py, TS, 2);
+      ctx.restore();
+    } else if (ch === "n") {
+      ctx.strokeStyle = "rgba(125,141,176,0.3)"; ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
+      ctx.strokeRect(px + 2.5, py + 2.5, TS - 5, TS - 5); ctx.setLineDash([]);
     } else if (ch === "c") {
       ctx.strokeStyle = "rgba(139,106,76,0.3)"; ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
       ctx.strokeRect(px + 2.5, py + 2.5, TS - 5, TS - 5); ctx.setLineDash([]);
