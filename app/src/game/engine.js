@@ -318,7 +318,7 @@ function buildLevel(i) {
   const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], lamps: [], lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], lamps: [], lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -335,6 +335,7 @@ function buildLevel(i) {
       else if (c === "O" || c === "Q") st.portals[c].push({ tx: x, ty: y });
       else if (c === "o") { st.coins.push({ x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
       else if (c === "A") st.vents.push({ tx: x, ty: y });
+      else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
       else if (c === "L") { st.lamps.push({ x: x * TS + 16, y: y * TS + 12 }); c = " "; }
       else if (c === "F") { if (!hard) st.flags.push({ tx: x, ty: y, on: false }); c = " "; }
       else if ((c === "*" || c === "+" || c === "$") && hard && !def.needsPower) c = " ";
@@ -363,7 +364,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -404,6 +405,42 @@ function inLamp(l, px, py, t) {
 function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
+  return true;
+}
+// Crushers (M): an iron mount in the ceiling with a stone weight that rests up, shakes, slams down to the
+// floor below, sits there, then winches back up. Each column runs the cycle shifted, like the vents.
+const CRUSH_T = 3.4, CRUSH_REST = 1.3, CRUSH_WARN = 0.45, CRUSH_FALL = 0.15, CRUSH_SIT = 0.5;
+// 0 = fully up, 1 = on the floor
+function crushPos(tx, t) {
+  const u = (t + tx * 0.5) % CRUSH_T, a = CRUSH_REST + CRUSH_WARN;
+  if (u < a) return 0;
+  if (u < a + CRUSH_FALL) { const k = (u - a) / CRUSH_FALL; return k * k; }
+  if (u < a + CRUSH_FALL + CRUSH_SIT) return 1;
+  return 1 - (u - a - CRUSH_FALL - CRUSH_SIT) / (CRUSH_T - a - CRUSH_FALL - CRUSH_SIT);
+}
+const crushWarn = (tx, t) => { const u = (t + tx * 0.5) % CRUSH_T; return u >= CRUSH_REST && u < CRUSH_REST + CRUSH_WARN; };
+// The weight's box; reach = empty tiles below the mount (measured once, when first needed).
+function crushBox(c, t) {
+  if (!c.reach) { let h = 0; while (h < 30 && !isSolid(c.tx, c.ty + h + 1)) h++; c.reach = Math.max(1, h); }
+  const y = (c.ty + 1) * TS + crushPos(c.tx, t) * (c.reach - 1) * TS;
+  return { x: c.tx * TS + 2, y, w: TS - 4, h: TS };
+}
+// True when no crusher in columns x0..x1 leaves its resting place within the next `secs` seconds (for tests).
+function crushClear(x0, x1, secs) {
+  for (const c of L.crushers) if (c.tx >= x0 && c.tx <= x1)
+    for (let s = 0; s <= secs; s += 0.05) if (crushPos(c.tx, runTime + s) > 0) return false;
+  return true;
+}
+// True when a runner leaving column x0 now at v tiles/s (negative = leftward) reaches column x1 without
+// passing under a weight that is off its rest; checked at a few speeds around v for slack (for tests).
+function crushRun(x0, x1, v) {
+  for (const k of [0.7, 0.85, 1, 1.15]) {
+    const sp = v * k, T = Math.abs((x1 - x0) / sp);
+    for (let s = 0; s <= T; s += 0.03) {
+      const x = x0 + sp * s + 0.28;
+      for (const c of L.crushers) if (Math.abs(c.tx + 0.5 - x) < 1.15 && crushPos(c.tx, runTime + s) > 0) return false;
+    }
+  }
   return true;
 }
 // True when no vent in columns x0..x1 fires within the next `secs` seconds (used by tests to time a crossing).
@@ -882,6 +919,10 @@ function updateWorld(dt) {
     if (ventState(v.tx, runTime) !== 2) continue;
     const h = ventReach(v);
     if (h && overlap(p, { x: v.tx * TS + 5, y: (v.ty - h) * TS + 4, w: TS - 10, h: h * TS - 4 })) { die("불기둥에 휩싸였다"); return; }
+  }
+  for (const c of L.crushers) {
+    const b = crushBox(c, runTime);
+    if (crushPos(c.tx, runTime) > 0 && overlap(p, { x: b.x + 2, y: b.y, w: b.w - 4, h: b.h - 2 })) { die("돌절구에 깔렸다"); return; }
   }
   if (p.y > L.H * TS + 60) { die("추락했다"); return; }
 
@@ -1456,6 +1497,10 @@ function prerender(st, R) {
       g.fillStyle = "#4d5a78";
       for (const [rx, ry] of [[5, 5], [TS - 6, 5], [5, TS - 6], [TS - 6, TS - 6]]) g.fillRect(px + rx, py + ry, 2, 2);
       if (top) { g.fillStyle = "#7d8db0"; g.fillRect(px, py, TS, 2); }
+    } else if (ch === "M") {
+      g.fillStyle = "#2a2f3e"; g.fillRect(px, py, TS, TS);
+      g.fillStyle = "#4d5a78"; g.fillRect(px + 4, py + TS - 8, TS - 8, 8);
+      g.fillStyle = "#171a26"; g.beginPath(); g.arc(px + 16, py + TS - 4, 4, 0, Math.PI * 2); g.fill();
     } else if (ch === "A") {
       g.fillStyle = "#2a2226"; g.fillRect(px, py, TS, TS);
       g.strokeStyle = "#45373a"; g.lineWidth = 1; g.strokeRect(px + 1.5, py + 1.5, TS - 3, TS - 3);
@@ -1556,6 +1601,21 @@ function drawLamps(t) {
     ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(-a);
     ctx.fillStyle = "#2c3346"; ctx.beginPath(); ctx.moveTo(-8, -4); ctx.lineTo(8, -4); ctx.lineTo(5, 5); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill();
     ctx.fillStyle = hot ? "#ff9a7a" : "#fff1b8"; ctx.fillRect(-4, 4, 8, 2);
+    ctx.restore();
+  }
+}
+function drawCrushers(t) {
+  for (const c of L.crushers) {
+    const px = c.tx * TS, py = c.ty * TS;
+    if (px + TS < cam.x - TS || px > cam.x + viewW + TS) continue;
+    const b = crushBox(c, runTime), sh = crushWarn(c.tx, runTime) ? Math.sin(t * 60) * 1.5 : 0;
+    ctx.fillStyle = "#4d5a78"; ctx.fillRect(px + 13, py + TS - 2, 2, b.y - py - TS + 4); ctx.fillRect(px + 17, py + TS - 2, 2, b.y - py - TS + 4);
+    ctx.save(); ctx.translate(sh, 0);
+    ctx.fillStyle = "#3b3a42"; ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = "#55535e"; ctx.fillRect(b.x + 2, b.y + 2, b.w - 4, 6);
+    ctx.fillStyle = "#26252c"; ctx.fillRect(b.x, b.y + b.h - 6, b.w, 6);
+    ctx.fillStyle = crushWarn(c.tx, runTime) ? "#ff8a5a" : "#8a8796";
+    for (let k = 0; k < 4; k++) ctx.fillRect(b.x + 2 + k * 7, b.y + b.h - 4, 4, 4);
     ctx.restore();
   }
 }
@@ -1987,6 +2047,7 @@ function render(t) {
     if (x1 > x0 && y1 > y0) ctx.drawImage(L.layer, x0 * R, y0 * R, (x1 - x0) * R, (y1 - y0) * R, x0, y0, x1 - x0, y1 - y0);
     drawDynamicTiles(t);
     drawVents(t);
+    drawCrushers(t);
     drawLamps(t);
     drawFlags(t);
     drawCoins(t);

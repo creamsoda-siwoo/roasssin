@@ -12,6 +12,7 @@
 // L searchlight (hangs from above; its beam sweeps side to side and spots you if you stay in it)
 // N crumbling floor (solid until you stand on it; cracks, falls away, regrows a few seconds later)
 // > < conveyor (solid floor that carries you right or left; you cannot stand still on it)
+// M crusher (iron ceiling mount; its stone weight shakes, slams down to the floor below, then winches back up)
 export const LEVELS = [
   {
     name: "첫 번째 줄",
