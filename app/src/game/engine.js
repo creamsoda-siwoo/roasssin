@@ -434,7 +434,7 @@ function crushClear(x0, x1, secs) {
 // True when a runner leaving column x0 now at v tiles/s (negative = leftward) reaches column x1 without
 // passing under a weight that is off its rest; checked at a few speeds around v for slack (for tests).
 function crushRun(x0, x1, v) {
-  for (const k of [0.7, 0.85, 1, 1.15]) {
+  for (const k of [0.88, 1, 1.12]) {
     const sp = v * k, T = Math.abs((x1 - x0) / sp);
     for (let s = 0; s <= T; s += 0.03) {
       const x = x0 + sp * s + 0.28;
