@@ -11,6 +11,7 @@
 // A flame vent (solid grate; every few seconds it flickers, then fires a column of flame up to 3 tiles high)
 // L searchlight (hangs from above; its beam sweeps side to side and spots you if you stay in it)
 // N crumbling floor (solid until you stand on it; cracks, falls away, regrows a few seconds later)
+// > < conveyor (solid floor that carries you right or left; you cannot stand still on it)
 export const LEVELS = [
   {
     name: "첫 번째 줄",

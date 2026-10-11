@@ -363,7 +363,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -372,6 +372,8 @@ function solidChar(c) {
 }
 const isSolid = (tx, ty) => solidChar(tileAt(tx, ty));
 
+// Conveyors (> and <) carry whoever stands on them at BELT_V, so you can never stand still on one.
+const BELT_V = 130;
 // Crumbling floor (N): cracks FLOOR_CRACK seconds after you step on it, falls away, then regrows like a rotten beam.
 const FLOOR_CRACK = 0.45;
 // Flame vents (A): a grate in the floor that fires a column of flame up to VENT_H tiles high.
@@ -692,6 +694,11 @@ function updatePlayer(dt) {
   // with no input the air column holds you in place instead of letting momentum carry you out
   if (inWind && !ix && !hooked) p.vx = approach(p.vx, 0, 1400 * dt);
 
+  // conveyor (> or <): standing on it carries you along on top of your own running
+  if (p.ground && !hooked) {
+    const belt = tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h + 1) / TS));
+    if (belt === ">" || belt === "<") moveAxis(p, "x", (belt === ">" ? 1 : -1) * BELT_V * dt);
+  }
   const fallV = p.vy;
   if (moveAxis(p, "x", p.vx * dt)) p.vx = 0;
   if (moveAxis(p, "y", p.vy * dt)) p.vy = 0;
@@ -1600,6 +1607,19 @@ function drawDynamicTiles(t) {
       ctx.beginPath(); ctx.moveTo(px + 9, py + 2); ctx.lineTo(px + 13, py + 11); ctx.lineTo(px + 10, py + 22); ctx.moveTo(px + 22, py + 4); ctx.lineTo(px + 19, py + 14); ctx.lineTo(px + 25, py + 26); ctx.stroke();
       ctx.fillStyle = "#8a96b4"; ctx.fillRect(px, py, TS, 2);
       ctx.restore();
+    } else if (ch === ">" || ch === "<") {
+      const dir = ch === ">" ? 1 : -1, off = ((t * BELT_V * dir) % 16 + 16) % 16;
+      ctx.fillStyle = "#1d2232"; ctx.fillRect(px, py, TS, TS);
+      ctx.fillStyle = "#2c3346"; ctx.fillRect(px, py + 3, TS, 8);
+      ctx.save(); ctx.beginPath(); ctx.rect(px, py + 3, TS, 8); ctx.clip();
+      ctx.strokeStyle = "#c9a45a"; ctx.lineWidth = 2;
+      for (let k = -1; k < 3; k++) {
+        const cx = px + k * 16 + off;
+        ctx.beginPath(); ctx.moveTo(cx - 3 * dir, py + 4); ctx.lineTo(cx + 3 * dir, py + 7); ctx.lineTo(cx - 3 * dir, py + 10); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.fillStyle = "#4d5a78"; ctx.fillRect(px, py, TS, 3);
+      ctx.fillStyle = "#151926"; ctx.beginPath(); ctx.arc(px + 8, py + 21, 4, 0, Math.PI * 2); ctx.arc(px + 24, py + 21, 4, 0, Math.PI * 2); ctx.fill();
     } else if (ch === "n") {
       ctx.strokeStyle = "rgba(125,141,176,0.3)"; ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
       ctx.strokeRect(px + 2.5, py + 2.5, TS - 5, TS - 5); ctx.setLineDash([]);
