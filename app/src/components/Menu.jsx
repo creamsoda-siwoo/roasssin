@@ -147,6 +147,7 @@ function Menu({ info, shown, touch, muted, install }) {
             {info.stats.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
           </dl>
         </details>
+        <SaveTransfer />
         <details className="fold">
           <summary>조작법</summary>
           <dl className="controls touch-only">
@@ -168,6 +169,41 @@ function Menu({ info, shown, touch, muted, install }) {
         </details>
       </div>
     </div>
+  );
+}
+
+// Move progress to another device: copy this device's code, or paste one from elsewhere.
+function SaveTransfer() {
+  const [code, setCode] = useState("");
+  const [paste, setPaste] = useState("");
+  const [msg, setMsg] = useState({ text: "", bad: false });
+  const copy = () => {
+    const c = game.exportCode();
+    setCode(c);
+    const done = () => setMsg({ text: "코드를 복사했다. 다른 기기의 '코드 붙여 넣기'에 넣어라.", bad: false });
+    const manual = () => setMsg({ text: "자동 복사가 막혀 있다. 아래 코드를 길게 눌러 직접 복사하라.", bad: false });
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(c).then(done, manual); else manual();
+  };
+  const load = () => {
+    if (!paste.trim()) { setMsg({ text: "먼저 코드를 붙여 넣어라.", bad: true }); return; }
+    if (!window.confirm("이 기기의 진행 상황을 붙여 넣은 코드로 바꿉니다. 되돌릴 수 없습니다. 계속할까요?")) return;
+    const err = game.importCode(paste);
+    setMsg(err ? { text: err, bad: true } : { text: "불러왔다. 다시 시작한다…", bad: false });
+  };
+  return (
+    <details className="fold">
+      <summary>진행 옮기기</summary>
+      <p className="xfernote">다른 기기나 브라우저로 진행 상황(막, 별, 기록, 업적, 설정)을 옮긴다. 고스트는 옮겨지지 않는다.</p>
+      <div className="row">
+        <button type="button" id="bExport" onClick={copy}>코드 복사</button>
+      </div>
+      {code && <textarea className="xfercode" id="exportCode" readOnly rows={3} value={code} onFocus={(e) => e.target.select()} aria-label="내 저장 코드" />}
+      <textarea className="xfercode" id="importCode" rows={3} value={paste} placeholder="다른 기기에서 복사한 코드 붙여 넣기" onChange={(e) => setPaste(e.target.value)} aria-label="저장 코드 붙여 넣기" />
+      <div className="row">
+        <button type="button" id="bImport" onClick={load}>불러오기</button>
+      </div>
+      {msg.text && <p className={"xfermsg" + (msg.bad ? " bad" : "")} id="xferMsg" role="status">{msg.text}</p>}
+    </details>
   );
 }
 

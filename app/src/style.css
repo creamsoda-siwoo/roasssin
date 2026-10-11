@@ -203,3 +203,10 @@ body.touch .hud-l { max-width: calc(100vw - 340px - env(safe-area-inset-left, 0p
 .statgrid div { padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
 .statgrid dt { font-size: 11px; color: var(--paper-dim); }
 .statgrid dd { margin: 2px 0 0; font-family: var(--display); font-size: 20px; color: var(--paper); font-variant-numeric: tabular-nums; }
+
+/* save transfer */
+.xfernote { margin: 0; font-size: 13px; color: var(--paper-dim); }
+.xfercode { display: block; width: 100%; box-sizing: border-box; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--paper); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
+.xfercode:focus { outline: 2px solid var(--rope); outline-offset: 1px; }
+.xfermsg { margin: 0; font-size: 13px; color: var(--teal); }
+.xfermsg.bad { color: var(--vermilion); }

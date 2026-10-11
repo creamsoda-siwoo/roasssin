@@ -46,6 +46,31 @@ function writeSave() {
   setState({ rev: getState().rev + 1 }); // the menu re-reads records and settings
 }
 const save = loadSave();
+
+// Save transfer: the whole save as one copyable code ("RA1." + base64 of the JSON + "." + checksum).
+// Ghost replays stay behind; they are large and rebuild themselves as you play.
+const CODE_PREFIX = "RA1.";
+function fnv(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619) >>> 0; return h.toString(36); }
+export function exportCode() {
+  const bytes = new TextEncoder().encode(JSON.stringify(save));
+  let bin = ""; for (const b of bytes) bin += String.fromCharCode(b);
+  const body = btoa(bin);
+  return CODE_PREFIX + body + "." + fnv(body);
+}
+// Checks a pasted code and, if it is good, replaces the save and reloads the game. Returns an error message otherwise.
+export function importCode(text) {
+  const code = String(text || "").replace(/\s+/g, "");
+  if (!code.startsWith(CODE_PREFIX)) return "저장 코드가 아니다. RA1. 로 시작하는 코드를 붙여 넣어라.";
+  const [body, sum] = code.slice(CODE_PREFIX.length).split(".");
+  if (!body || fnv(body) !== sum) return "코드가 잘렸거나 틀렸다. 처음부터 끝까지 다시 복사해 보라.";
+  let data;
+  try { data = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(body), (c) => c.charCodeAt(0)))); } catch (e) { return "코드를 읽을 수 없다."; }
+  if (!data || typeof data.unlocked !== "number" || typeof data.best !== "object") return "진행 기록이 들어 있지 않은 코드다.";
+  data.unlocked = Math.max(1, Math.min(LEVELS.length, Math.floor(data.unlocked)));
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { return "이 브라우저에는 저장할 수 없다."; }
+  setTimeout(() => location.reload(), 600); // loadSave() and the map migration run on the fresh start
+  return "";
+}
 // Daily challenge: one stage and one twist per calendar day; clearing it on consecutive days builds a streak.
 const DAILY_MODS = [
   { name: "저중력", desc: "몸이 가볍다 · 중력 70%" },
