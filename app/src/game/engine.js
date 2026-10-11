@@ -318,7 +318,7 @@ function buildLevel(i) {
   const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], lamps: [], lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -335,6 +335,7 @@ function buildLevel(i) {
       else if (c === "O" || c === "Q") st.portals[c].push({ tx: x, ty: y });
       else if (c === "o") { st.coins.push({ x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
       else if (c === "A") st.vents.push({ tx: x, ty: y });
+      else if (c === "L") { st.lamps.push({ x: x * TS + 16, y: y * TS + 12 }); c = " "; }
       else if (c === "F") { if (!hard) st.flags.push({ tx: x, ty: y, on: false }); c = " "; }
       else if ((c === "*" || c === "+" || c === "$") && hard && !def.needsPower) c = " ";
       else if (c === "*" || c === "+" || c === "$") { st.powers.push({ kind: c, x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
@@ -384,6 +385,22 @@ function ventReach(v) {
   let h = 0;
   while (h < VENT_H && !isSolid(v.tx, v.ty - h - 1)) h++;
   return h;
+}
+// Searchlights (L): a lamp hung from above whose beam sweeps left and right. Standing in the beam
+// for LAMP_SEE seconds gets you spotted; walls and roofs cast shadows, and the cloak hides you.
+const LAMP_T = 5, LAMP_SWING = 0.6, LAMP_HALF = 0.18, LAMP_LEN = 15 * TS;
+const lampAngle = (l, t) => LAMP_SWING * Math.sin((t / LAMP_T) * Math.PI * 2 + l.x * 0.004); // 0 = straight down, + = right
+function inLamp(l, px, py, t) {
+  const dx = px - l.x, dy = py - l.y;
+  if (dy <= 0 || Math.hypot(dx, dy) > LAMP_LEN) return false;
+  if (Math.abs(Math.atan2(dx, dy) - lampAngle(l, t)) > LAMP_HALF) return false;
+  return segClear(l.x, l.y, px, py, 10, 4, true);
+}
+// True when no beam touches a player standing anywhere on columns x0..x1 of row ty during the next `secs` seconds (for tests).
+function lightClear(x0, x1, ty, secs) {
+  for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
+    for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
+  return true;
 }
 // True when no vent in columns x0..x1 fires within the next `secs` seconds (used by tests to time a crossing).
 function ventClear(x0, x1, secs) {
@@ -839,6 +856,11 @@ function updateWorld(dt) {
   const x0 = Math.floor(p.x / TS), x1 = Math.floor((p.x + p.w) / TS), y0 = Math.floor(p.y / TS), y1 = Math.floor((p.y + p.h) / TS);
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++)
     if (tileAt(tx, ty) === "^" && overlap(p, { x: tx * TS + 4, y: ty * TS + 16, w: TS - 8, h: TS - 16 })) { die("가시에 찔렸다"); return; }
+  if (L.lamps.length) {
+    const lit = p.cloak <= 0 && p.invul <= 0 && L.lamps.some((l) => inLamp(l, p.x + p.w / 2, p.y + p.h / 2, runTime) || inLamp(l, p.x + p.w / 2, p.y + 4, runTime));
+    L.lampSee = lit ? L.lampSee + dt : Math.max(0, L.lampSee - dt * 0.7);
+    if (L.lampSee >= (hard ? 0.18 : 0.25)) { sfx.alert(); die("탐조등에 들켰다"); return; }
+  }
   for (const v of L.vents) {
     if (ventState(v.tx, runTime) !== 2) continue;
     const h = ventReach(v);
@@ -1499,6 +1521,26 @@ function drawSky(t) {
 
 function worldTransform() { ctx.setTransform(dpr * scale, 0, 0, dpr * scale, -cam.x * scale * dpr, -cam.y * scale * dpr); }
 
+function drawLamps(t) {
+  for (const l of L.lamps) {
+    if (l.x < cam.x - LAMP_LEN || l.x > cam.x + viewW + LAMP_LEN) continue;
+    const a = lampAngle(l, runTime);
+    // the beam stops at the first wall or roof along each edge
+    const edge = (ang) => { const dx = Math.sin(ang), dy = Math.cos(ang), r = rayLen(l.x + dx * 10, l.y + dy * 10, dx, dy, LAMP_LEN); return [l.x + dx * (r + 10), l.y + dy * (r + 10)]; };
+    const [ax, ay] = edge(a - LAMP_HALF), [mx, my] = edge(a), [bx, by] = edge(a + LAMP_HALF);
+    const hot = L.lampSee > 0;
+    const gr = ctx.createRadialGradient(l.x, l.y, 4, l.x, l.y, LAMP_LEN);
+    gr.addColorStop(0, hot ? "rgba(255,170,140,0.55)" : "rgba(255,244,200,0.42)"); gr.addColorStop(1, "rgba(255,244,200,0)");
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(ax, ay); ctx.lineTo(mx, my); ctx.lineTo(bx, by); ctx.closePath(); ctx.fill();
+    // the lamp itself: a hood on a short chain
+    ctx.strokeStyle = "#4d5a78"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(l.x, l.y - 12); ctx.lineTo(l.x, l.y - 4); ctx.stroke();
+    ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(-a);
+    ctx.fillStyle = "#2c3346"; ctx.beginPath(); ctx.moveTo(-8, -4); ctx.lineTo(8, -4); ctx.lineTo(5, 5); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = hot ? "#ff9a7a" : "#fff1b8"; ctx.fillRect(-4, 4, 8, 2);
+    ctx.restore();
+  }
+}
 function drawVents(t) {
   for (const v of L.vents) {
     const px = v.tx * TS, py = v.ty * TS;
@@ -1901,6 +1943,7 @@ function render(t) {
     if (x1 > x0 && y1 > y0) ctx.drawImage(L.layer, x0 * R, y0 * R, (x1 - x0) * R, (y1 - y0) * R, x0, y0, x1 - x0, y1 - y0);
     drawDynamicTiles(t);
     drawVents(t);
+    drawLamps(t);
     drawFlags(t);
     drawCoins(t);
     drawPowers(t);

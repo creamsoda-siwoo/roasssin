@@ -9,6 +9,7 @@
 // J spring pad (solid, launches you upward)  W updraft (rising air, lifts you while inside)
 // P start  K key  B crate  T patrol guard  Y/U static guard facing left/right  V watcher (turns around)  ! patrol turn marker
 // A flame vent (solid grate; every few seconds it flickers, then fires a column of flame up to 3 tiles high)
+// L searchlight (hangs from above; its beam sweeps side to side and spots you if you stay in it)
 export const LEVELS = [
   {
     name: "첫 번째 줄",
