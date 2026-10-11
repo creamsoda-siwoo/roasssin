@@ -38,9 +38,9 @@ const REBUILT = [43, 58, 66, 70, 92, 98, 107, 112, 113, 119, 121, 125, 126, 127,
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {} };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {}, bonusGhost: !!s.bonusGhost };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {}, bonus: {} };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {}, bonus: {}, bonusGhost: true };
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
@@ -108,7 +108,13 @@ if (save.mapRev < MAP_REV) {
   try { localStorage.setItem(GHOST_KEY, JSON.stringify(ghosts)); } catch (e) {}
   writeSave();
 }
-const ghostId = (i) => diff + ":" + i;
+const ghostId = (i) => diff + ":" + (i === BONUS_I ? "bonus" : i);
+// The bonus ghost was first stored under index 300 (one past the campaign, which then ended at 300); give it its fixed key.
+if (!save.bonusGhost) {
+  for (const d of [0, 1, 2]) if (ghosts[d + ":300"] && save.bonus && save.bonus[d]) { ghosts[d + ":bonus"] = ghosts[d + ":300"]; delete ghosts[d + ":300"]; }
+  save.bonusGhost = true;
+  try { localStorage.setItem(GHOST_KEY, JSON.stringify(ghosts)); } catch (e) {}
+}
 function storeGhost(i, pts) {
   if (pts.length < 4 || pts.length > GHOST_HZ * 2 * 240) return;
   ghosts[ghostId(i)] = { at: Date.now(), d: pts.map((v) => v.toString(36)).join(",") };
@@ -991,8 +997,8 @@ function respawnAtCheckpoint() {
 function restartLevel() { if (L) startLevel(cur, true); }
 function nextLevel() {
   if (cur === BONUS_I) showMenu();
+  else if (cur === EPILOGUE_AFTER && !save.story.end) { const i = cur + 1; showStory("end", i < LEVELS.length ? () => beginLevel(i) : null); }
   else if (cur + 1 < LEVELS.length) beginLevel(cur + 1);
-  else if (!save.story.end) showStory("end", null);
   else showMenu();
 }
 // Normal play opens each chapter with its story the first time; speedruns and the daily challenge skip it.
@@ -1001,6 +1007,8 @@ function beginLevel(i) {
   if (c >= 0 && !save.story[c] && !run && !daily) showStory(c, () => startLevel(i, false));
   else startLevel(i, false);
 }
+// The epilogue closes the Black Moon story after stage 300; later chapters begin a new one.
+const EPILOGUE_AFTER = Math.min(299, LEVELS.length - 1);
 let storyThen = null, storyKey = null;
 function showStory(key, then) {
   const ch = key === "end" ? EPILOGUE : CHAPTERS[key];
@@ -1196,8 +1204,12 @@ export function menuInfo() {
     }),
     stats: playStats(),
     bonus: { label: "보너스 · 초고난도" + (save.bonus[diff] ? ` · 최고 ${save.bonus[diff].time.toFixed(1)}초` : ""), cleared: !!save.bonus[diff] },
-    story: CHAPTERS.map((c, k) => ({ key: k, label: `제${k + 1}장 · ${c.title}`, open: save.unlocked > c.from }))
-      .concat([{ key: "end", label: "에필로그 · " + EPILOGUE.title, open: !!save.story.end || !!save.best[LEVELS.length - 1] }]),
+    story: (() => {
+      const list = CHAPTERS.map((c, k) => ({ key: k, label: `제${k + 1}장 · ${c.title}`, open: save.unlocked > c.from }));
+      const at = CHAPTERS.findIndex((c) => c.from > EPILOGUE_AFTER);
+      list.splice(at < 0 ? list.length : at, 0, { key: "end", label: "에필로그 · " + EPILOGUE.title, open: !!save.story.end || !!save.best[EPILOGUE_AFTER] });
+      return list;
+    })(),
     segments: SEGMENTS.map(([a, b], idx) => {
       const locked = b >= save.unlocked, best = srTable()[segKey(a, b)];
       return {
