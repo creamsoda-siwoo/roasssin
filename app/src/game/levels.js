@@ -8,6 +8,7 @@
 // F checkpoint flag (touch it and you respawn there)  O / Q teleport doors (two of each letter, linked)  I ice floor (solid, slippery)
 // J spring pad (solid, launches you upward)  W updraft (rising air, lifts you while inside)
 // P start  K key  B crate  T patrol guard  Y/U static guard facing left/right  V watcher (turns around)  ! patrol turn marker
+// A flame vent (solid grate; every few seconds it flickers, then fires a column of flame up to 3 tiles high)
 export const LEVELS = [
   {
     name: "첫 번째 줄",

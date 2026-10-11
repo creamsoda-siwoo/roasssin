@@ -318,7 +318,7 @@ function buildLevel(i) {
   const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -334,6 +334,7 @@ function buildLevel(i) {
       else if (c === "E") st.exit = { x: x * TS, y: y * TS, w: TS, h: TS };
       else if (c === "O" || c === "Q") st.portals[c].push({ tx: x, ty: y });
       else if (c === "o") { st.coins.push({ x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
+      else if (c === "A") st.vents.push({ tx: x, ty: y });
       else if (c === "F") { if (!hard) st.flags.push({ tx: x, ty: y, on: false }); c = " "; }
       else if ((c === "*" || c === "+" || c === "$") && hard && !def.needsPower) c = " ";
       else if (c === "*" || c === "+" || c === "$") { st.powers.push({ kind: c, x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
@@ -361,7 +362,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -369,6 +370,27 @@ function solidChar(c) {
   }
 }
 const isSolid = (tx, ty) => solidChar(tileAt(tx, ty));
+
+// Flame vents (A): a grate in the floor that fires a column of flame up to VENT_H tiles high.
+// Each vent runs the same cycle shifted by its column, so a row of vents fires as a wave.
+const VENT_T = 2.8, VENT_ON = 1.1, VENT_WARN = 0.45, VENT_H = 3;
+// 0 quiet, 1 about to fire, 2 firing
+function ventState(tx, t) {
+  const u = (t + tx * 0.35) % VENT_T;
+  return u < VENT_ON ? 2 : u > VENT_T - VENT_WARN ? 1 : 0;
+}
+// How many tiles of flame rise above a vent before something solid stops them.
+function ventReach(v) {
+  let h = 0;
+  while (h < VENT_H && !isSolid(v.tx, v.ty - h - 1)) h++;
+  return h;
+}
+// True when no vent in columns x0..x1 fires within the next `secs` seconds (used by tests to time a crossing).
+function ventClear(x0, x1, secs) {
+  for (const v of L.vents) if (v.tx >= x0 && v.tx <= x1)
+    for (let s = 0; s <= secs; s += 0.05) if (ventState(v.tx, runTime + s) === 2) return false;
+  return true;
+}
 
 // ---------- collision ----------
 function blockers(box, self) {
@@ -817,6 +839,11 @@ function updateWorld(dt) {
   const x0 = Math.floor(p.x / TS), x1 = Math.floor((p.x + p.w) / TS), y0 = Math.floor(p.y / TS), y1 = Math.floor((p.y + p.h) / TS);
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++)
     if (tileAt(tx, ty) === "^" && overlap(p, { x: tx * TS + 4, y: ty * TS + 16, w: TS - 8, h: TS - 16 })) { die("가시에 찔렸다"); return; }
+  for (const v of L.vents) {
+    if (ventState(v.tx, runTime) !== 2) continue;
+    const h = ventReach(v);
+    if (h && overlap(p, { x: v.tx * TS + 5, y: (v.ty - h) * TS + 4, w: TS - 10, h: h * TS - 4 })) { die("불기둥에 휩싸였다"); return; }
+  }
   if (p.y > L.H * TS + 60) { die("추락했다"); return; }
 
   // coins
@@ -1389,6 +1416,12 @@ function prerender(st, R) {
       g.fillStyle = "#4d5a78";
       for (const [rx, ry] of [[5, 5], [TS - 6, 5], [5, TS - 6], [TS - 6, TS - 6]]) g.fillRect(px + rx, py + ry, 2, 2);
       if (top) { g.fillStyle = "#7d8db0"; g.fillRect(px, py, TS, 2); }
+    } else if (ch === "A") {
+      g.fillStyle = "#2a2226"; g.fillRect(px, py, TS, TS);
+      g.strokeStyle = "#45373a"; g.lineWidth = 1; g.strokeRect(px + 1.5, py + 1.5, TS - 3, TS - 3);
+      g.fillStyle = "#120c0e";
+      for (let k = 0; k < 4; k++) g.fillRect(px + 5 + k * 6, py + 2, 3, 9);
+      g.fillStyle = "#6b4b3e"; g.fillRect(px, py, TS, 2);
     } else if (ch === "I") {
       g.fillStyle = "#2b3f55"; g.fillRect(px, py, TS, TS);
       g.fillStyle = "rgba(190,230,255,0.18)";
@@ -1466,6 +1499,30 @@ function drawSky(t) {
 
 function worldTransform() { ctx.setTransform(dpr * scale, 0, 0, dpr * scale, -cam.x * scale * dpr, -cam.y * scale * dpr); }
 
+function drawVents(t) {
+  for (const v of L.vents) {
+    const px = v.tx * TS, py = v.ty * TS;
+    if (px + TS < cam.x - TS || px > cam.x + viewW + TS) continue;
+    const st = ventState(v.tx, runTime);
+    if (st === 0) continue;
+    if (st === 1) { // warning: the grate glows and sparks
+      ctx.fillStyle = `rgba(255,140,60,${0.35 + 0.3 * Math.sin(t * 30)})`;
+      for (let k = 0; k < 4; k++) ctx.fillRect(px + 5 + k * 6, py + 2, 3, 9);
+      continue;
+    }
+    const h = ventReach(v) * TS;
+    if (!h) continue;
+    const top = py - h, fl = 0.85 + 0.15 * Math.sin(t * 40 + v.tx);
+    const gr = ctx.createLinearGradient(0, py, 0, top);
+    gr.addColorStop(0, "rgba(255,240,170,0.95)"); gr.addColorStop(0.45, "rgba(255,140,40,0.85)"); gr.addColorStop(1, "rgba(200,40,20,0)");
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.moveTo(px + 3, py);
+    ctx.quadraticCurveTo(px + 2 + Math.sin(t * 23 + v.tx) * 4, py - h * 0.5, px + TS / 2 + Math.sin(t * 17) * 3, top + h * (1 - fl));
+    ctx.quadraticCurveTo(px + TS - 2 + Math.cos(t * 19 + v.tx) * 4, py - h * 0.5, px + TS - 3, py);
+    ctx.closePath(); ctx.fill();
+  }
+}
 function drawDynamicTiles(t) {
   const x0 = Math.max(0, Math.floor(cam.x / TS) - 1), x1 = Math.min(L.W - 1, Math.ceil((cam.x + viewW) / TS) + 1);
   const y0 = Math.max(0, Math.floor(cam.y / TS) - 1), y1 = Math.min(L.H - 1, Math.ceil((cam.y + viewH) / TS) + 1);
@@ -1843,6 +1900,7 @@ function render(t) {
     const x1 = Math.min(L.W * TS, Math.ceil(cam.x + viewW) + 1), y1 = Math.min(L.H * TS, Math.ceil(cam.y + viewH) + 1);
     if (x1 > x0 && y1 > y0) ctx.drawImage(L.layer, x0 * R, y0 * R, (x1 - x0) * R, (y1 - y0) * R, x0, y0, x1 - x0, y1 - y0);
     drawDynamicTiles(t);
+    drawVents(t);
     drawFlags(t);
     drawCoins(t);
     drawPowers(t);
