@@ -8674,7 +8674,7 @@ export const LEVELS = [
       "X                                                          X",
       "X                                                          X",
       "X P                                                       EX",
-      "XXXXXXXXXNNNNNNXXXNNXNNXXXNNNNNNNNNNNNNXXXNNXNNXXXNNXXXXXXXX",
+      "XXXXXXXXXNNNNNNXXXNXXXNXXXNNNNNNNNNNNNNXXXNXXXNXXXNNXXXXXXXX",
       "X                                                          X",
       "X^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^X",
       "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
