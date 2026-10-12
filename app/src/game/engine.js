@@ -413,8 +413,9 @@ function lightClear(x0, x1, ty, secs) {
   return true;
 }
 // Moving platforms (= slides left and right, | rises and falls): a plank two tiles wide that travels back and
-// forth at MOVER_V along its track (ending at anything solid or a ! marker) and carries whoever stands on it.
-const MOVER_V = 80, MOVER_W = 64, MOVER_H = 12;
+// forth at MOVER_V along its track (ending at anything solid or a ! marker), resting MOVER_WAIT seconds at each
+// end, and carries whoever stands on it. A plank marked at the far end of its track starts by heading back.
+const MOVER_V = 80, MOVER_W = 64, MOVER_H = 12, MOVER_WAIT = 0.8;
 function moverTrack(m) {
   if (m.a >= 0) return;
   const ok = (x, y) => !isSolid(x, y) && tileAt(x, y) !== "!";
@@ -428,7 +429,11 @@ function moverBox(m, t) {
   moverTrack(m);
   const len = (m.b - m.a) * TS, home = ((m.vert ? m.ty : m.tx) - m.a) * TS;
   let pos = home;
-  if (len > 0) { const u = (home + MOVER_V * Math.max(0, t)) % (2 * len); pos = u <= len ? u : 2 * len - u; }
+  if (len > 0) {
+    const D = len / MOVER_V, w = MOVER_WAIT, s0 = home >= len ? D + w : home / MOVER_V;
+    const u = (s0 + Math.max(0, t)) % (2 * (D + w));
+    pos = u < D ? u * MOVER_V : u < D + w ? len : u < 2 * D + w ? len - (u - D - w) * MOVER_V : 0;
+  }
   return m.vert ? { x: m.tx * TS, y: m.a * TS + pos, w: MOVER_W, h: MOVER_H } : { x: m.a * TS + pos, y: m.ty * TS, w: MOVER_W, h: MOVER_H };
 }
 // For tests: plank i's left edge / top in tiles, and which way it is heading (+1 right or down).
@@ -440,7 +445,14 @@ function updateMovers(dt) {
   for (const m of L.movers) {
     const o = moverBox(m, runTime - dt), n = moverBox(m, runTime);
     const riding = p.vy >= 0 && Math.abs(p.y + p.h - o.y) < 2.5 && p.x + p.w > o.x + 1 && p.x < o.x + o.w - 1;
-    if (!riding) continue;
+    if (!riding) {
+      // a plank that moves into you pushes you aside, or crushes you if it comes down on you
+      if (mode === "play" && overlap(p, n) && !overlap(p, o)) {
+        if (m.vert && n.y > o.y) { die("발판에 깔렸다"); return; }
+        if (!m.vert) moveAxis(p, "x", n.x - o.x);
+      }
+      continue;
+    }
     if (n.x !== o.x) moveAxis(p, "x", n.x - o.x);
     if (n.y !== o.y) p.y = n.y - p.h;
   }
