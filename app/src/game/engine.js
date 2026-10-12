@@ -318,7 +318,7 @@ function buildLevel(i) {
   const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], arrows: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -336,6 +336,7 @@ function buildLevel(i) {
       else if (c === "o") { st.coins.push({ x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
       else if (c === "A") st.vents.push({ tx: x, ty: y });
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
+      else if (c === "R" || c === "r") st.arrows.push({ tx: x, ty: y, dir: c === "R" ? 1 : -1, range: -1 });
       else if (c === "L") { st.lamps.push({ x: x * TS + 16, y: y * TS + 12 }); c = " "; }
       else if (c === "F") { if (!hard) st.flags.push({ tx: x, ty: y, on: false }); c = " "; }
       else if ((c === "*" || c === "+" || c === "$") && hard && !def.needsPower) c = " ";
@@ -364,7 +365,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -407,6 +408,39 @@ function inLamp(l, px, py, t) {
 function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
+  return true;
+}
+// Arrow traps (R fires right, r fires left): a slot in the wall that looses an arrow every ARROW_T seconds.
+// The arrow flies at ARROW_V until it meets something solid; arrows fly at waist height, so a jump clears them.
+const ARROW_T = 2, ARROW_V = 420, ARROW_L = 22, ARROW_WARN = 0.35;
+const arrowPhase = (a, t) => (t + a.tx * 0.3) % ARROW_T;
+// The boxes of every arrow in flight from launcher `a` at time t.
+function arrowBoxes(a, t) {
+  if (a.range < 0) { let n = 0; while (n < 80 && !isSolid(a.tx + a.dir * (n + 1), a.ty)) n++; a.range = n * TS; }
+  const out = [], face = a.dir > 0 ? (a.tx + 1) * TS : a.tx * TS, y = a.ty * TS + 13;
+  for (let u = arrowPhase(a, t); u * ARROW_V < a.range + ARROW_L; u += ARROW_T) {
+    const d = u * ARROW_V, near = Math.max(0, d - ARROW_L), far = Math.min(d, a.range);
+    if (far <= near) continue;
+    out.push(a.dir > 0 ? { x: face + near, y, w: far - near, h: 6 } : { x: face - far, y, w: far - near, h: 6 });
+  }
+  return out;
+}
+// True when a runner leaving column x0 now at v tiles/s (negative = leftward) reaches x1 without meeting an arrow
+// on row ty, checked at a few speeds around v; t0 delays the start (for tests).
+function arrowRun(x0, x1, ty, v, t0 = 0) {
+  for (const k of [0.9, 1, 1.1]) {
+    const sp = v * k, T = Math.abs((x1 - x0) / sp);
+    for (let s = 0; s <= T; s += 0.02) {
+      const box = { x: (x0 + sp * s) * TS - 3, y: ty * TS + 4, w: PW + 6, h: PH };
+      for (const a of L.arrows) if (a.ty === ty && arrowBoxes(a, runTime + t0 + s).some((b) => overlap(box, b))) return false;
+    }
+  }
+  return true;
+}
+// True when no arrow on row ty crosses columns x0..x1 between t0 and t1 seconds from now (for tests).
+function arrowGap(x0, x1, ty, t0, t1) {
+  const box = { x: x0 * TS, y: ty * TS, w: (x1 - x0 + 1) * TS, h: TS };
+  for (let s = t0; s <= t1; s += 0.02) for (const a of L.arrows) if (a.ty === ty && arrowBoxes(a, runTime + s).some((b) => overlap(box, b))) return false;
   return true;
 }
 // Blinking planks (Z and z): Z is solid for the first half of every BLINK_T seconds and z for the second,
@@ -935,6 +969,7 @@ function updateWorld(dt) {
     const h = ventReach(v);
     if (h && overlap(p, { x: v.tx * TS + 5, y: (v.ty - h) * TS + 4, w: TS - 10, h: h * TS - 4 })) { die("불기둥에 휩싸였다"); return; }
   }
+  for (const a of L.arrows) for (const b of arrowBoxes(a, runTime)) if (overlap(p, b)) { die("화살에 맞았다"); return; }
   for (const c of L.crushers) {
     const b = crushBox(c, runTime);
     if (crushPos(c.tx, runTime) > 0 && overlap(p, { x: b.x + 2, y: b.y, w: b.w - 4, h: b.h - 2 })) { die("돌절구에 깔렸다"); return; }
@@ -1527,6 +1562,14 @@ function prerender(st, R) {
       g.fillStyle = "#4d5a78";
       for (const [rx, ry] of [[5, 5], [TS - 6, 5], [5, TS - 6], [TS - 6, TS - 6]]) g.fillRect(px + rx, py + ry, 2, 2);
       if (top) { g.fillStyle = "#7d8db0"; g.fillRect(px, py, TS, 2); }
+    } else if (ch === "R" || ch === "r") {
+      g.fillStyle = "#212839"; g.fillRect(px, py, TS, TS);
+      g.strokeStyle = "#323c55"; g.lineWidth = 1; g.strokeRect(px + 1.5, py + 1.5, TS - 3, TS - 3);
+      g.fillStyle = "#0c0e16"; g.fillRect(ch === "R" ? px + TS - 7 : px, py + 12, 7, 8);
+      g.fillStyle = "#8a7a5a"; g.beginPath();
+      if (ch === "R") { g.moveTo(px + 8, py + 10); g.lineTo(px + 16, py + 16); g.lineTo(px + 8, py + 22); }
+      else { g.moveTo(px + 24, py + 10); g.lineTo(px + 16, py + 16); g.lineTo(px + 24, py + 22); }
+      g.closePath(); g.fill();
     } else if (ch === "M") {
       g.fillStyle = "#2a2f3e"; g.fillRect(px, py, TS, TS);
       g.fillStyle = "#4d5a78"; g.fillRect(px + 4, py + TS - 8, TS - 8, 8);
@@ -1632,6 +1675,20 @@ function drawLamps(t) {
     ctx.fillStyle = "#2c3346"; ctx.beginPath(); ctx.moveTo(-8, -4); ctx.lineTo(8, -4); ctx.lineTo(5, 5); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill();
     ctx.fillStyle = hot ? "#ff9a7a" : "#fff1b8"; ctx.fillRect(-4, 4, 8, 2);
     ctx.restore();
+  }
+}
+function drawArrows(t) {
+  for (const a of L.arrows) {
+    const px = a.tx * TS, py = a.ty * TS;
+    if (Math.abs(px - (cam.x + viewW / 2)) > viewW + a.range + TS) continue;
+    if (arrowPhase(a, runTime) > ARROW_T - ARROW_WARN) { ctx.fillStyle = `rgba(255,190,90,${0.5 + 0.4 * Math.sin(t * 30)})`; ctx.fillRect(a.dir > 0 ? px + TS - 5 : px, py + 12, 5, 8); }
+    for (const b of arrowBoxes(a, runTime)) {
+      const tip = a.dir > 0 ? b.x + b.w : b.x, y = b.y + 3;
+      ctx.strokeStyle = "#c9b48a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.x + b.w, y); ctx.stroke();
+      ctx.fillStyle = "#e6e9f2"; ctx.beginPath(); ctx.moveTo(tip + a.dir * 5, y); ctx.lineTo(tip - a.dir * 2, y - 4); ctx.lineTo(tip - a.dir * 2, y + 4); ctx.closePath(); ctx.fill();
+      const tail = a.dir > 0 ? b.x : b.x + b.w;
+      if (b.w >= ARROW_L - 1) { ctx.fillStyle = "#b0453a"; ctx.fillRect(tail - (a.dir > 0 ? 0 : 5), y - 3, 5, 2); ctx.fillRect(tail - (a.dir > 0 ? 0 : 5), y + 1, 5, 2); }
+    }
   }
 }
 function drawCrushers(t) {
@@ -2090,6 +2147,7 @@ function render(t) {
     drawDynamicTiles(t);
     drawVents(t);
     drawCrushers(t);
+    drawArrows(t);
     drawLamps(t);
     drawFlags(t);
     drawCoins(t);

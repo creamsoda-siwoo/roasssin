@@ -14,6 +14,7 @@
 // > < conveyor (solid floor that carries you right or left; you cannot stand still on it)
 // M crusher (iron ceiling mount; its stone weight shakes, slams down to the floor below, then winches back up)
 // Z z blinking planks (Z is solid for half of every 3 s, z for the other half; they flicker before vanishing)
+// R r arrow trap (a slot in the wall that shoots an arrow right / left every 2 s, at waist height, until it hits something solid)
 export const LEVELS = [
   {
     name: "첫 번째 줄",
