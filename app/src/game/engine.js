@@ -336,6 +336,7 @@ function buildLevel(i) {
       else if (c === "o") { st.coins.push({ x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
       else if (c === "A") st.vents.push({ tx: x, ty: y });
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
+      else if (c === "{" || c === "}") st.gusty = true;
       else if (c === "=" || c === "|") { st.movers.push({ tx: x, ty: y, vert: c === "|", a: -1, b: -1 }); c = " "; }
       else if (c === "@" || c === "%") { st.saws.push({ tx: x, ty: y, vert: c === "%", a: -1, b: -1 }); c = " "; }
       else if (c === "R" || c === "r") st.arrows.push({ tx: x, ty: y, dir: c === "R" ? 1 : -1, range: -1 });
@@ -410,6 +411,16 @@ function inLamp(l, px, py, t) {
 function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
+  return true;
+}
+// Crosswind ({ blows left, } blows right): open air that gusts for GUST_ON seconds out of every GUST_T, all in
+// step; the streaks thicken GUST_WARN seconds before a gust. A gust pushes harder than you can run against it.
+const GUST_T = 3.2, GUST_ON = 1.6, GUST_WARN = 0.4, GUST_PUSH = 260;
+// 0 still, 1 about to blow, 2 blowing
+const gustState = (t) => { const u = t % GUST_T; return u < GUST_ON ? 2 : u > GUST_T - GUST_WARN ? 1 : 0; };
+// For tests: the gust blows (on = 1) or stays still (on = 0) for the whole of the next `secs` seconds.
+function gustClear(on, secs) {
+  for (let s = 0; s <= secs; s += 0.05) if ((gustState(runTime + s) === 2) !== !!on) return false;
   return true;
 }
 // Moving platforms (= slides left and right, | rises and falls): a plank two tiles wide that travels back and
@@ -868,6 +879,11 @@ function updatePlayer(dt) {
     p.carry = belt === ">" ? BELT_V : belt === "<" ? -BELT_V : 0;
     if (p.carry) moveAxis(p, "x", p.carry * dt);
   } else if (p.carry) { p.vx += p.carry; p.carry = 0; }
+  // crosswind ({ or }): while the gust blows it shoves you sideways harder than you can run
+  if (!hooked && L.gusty) {
+    const gt = tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h / 2) / TS));
+    if ((gt === "}" || gt === "{") && gustState(runTime) === 2) moveAxis(p, "x", (gt === "}" ? 1 : -1) * GUST_PUSH * dt);
+  }
   const fallV = p.vy;
   if (moveAxis(p, "x", p.vx * dt)) p.vx = 0;
   if (moveAxis(p, "y", p.vy * dt)) p.vy = 0;
@@ -1896,6 +1912,18 @@ function drawDynamicTiles(t) {
       } else {
         ctx.strokeStyle = col; ctx.globalAlpha = 0.3; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
         ctx.strokeRect(px + 2.5, py + 2.5, TS - 5, TS - 5); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
+    } else if (ch === "{" || ch === "}") {
+      const gs = gustState(runTime), dir = ch === "}" ? 1 : -1;
+      if (gs === 0) { if ((x + y) % 2 === 0) { ctx.fillStyle = "rgba(170,200,220,0.12)"; ctx.fillRect(px + 14, py + 14, 4, 4); } }
+      else {
+        const n = gs === 2 ? 3 : 1, sp = gs === 2 ? 420 : 120;
+        ctx.strokeStyle = gs === 2 ? "rgba(190,220,240,0.45)" : "rgba(190,220,240,0.22)"; ctx.lineWidth = 1.5;
+        for (let k = 0; k < n; k++) {
+          const yy = py + 6 + ((k * 11 + hash(x, y + k) * 20) % 22);
+          const xx = px + ((((t * sp * dir + hash(x + k, y) * 64) % TS) + TS) % TS);
+          ctx.beginPath(); ctx.moveTo(xx - 7 * dir, yy); ctx.lineTo(xx + 3 * dir, yy); ctx.stroke();
+        }
       }
     } else if (ch === "n") {
       ctx.strokeStyle = "rgba(125,141,176,0.3)"; ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
