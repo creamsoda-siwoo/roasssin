@@ -318,7 +318,7 @@ function buildLevel(i) {
   const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], arrows: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], arrows: [], saws: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -336,6 +336,7 @@ function buildLevel(i) {
       else if (c === "o") { st.coins.push({ x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
       else if (c === "A") st.vents.push({ tx: x, ty: y });
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
+      else if (c === "@" || c === "%") { st.saws.push({ tx: x, ty: y, vert: c === "%", a: -1, b: -1 }); c = " "; }
       else if (c === "R" || c === "r") st.arrows.push({ tx: x, ty: y, dir: c === "R" ? 1 : -1, range: -1 });
       else if (c === "L") { st.lamps.push({ x: x * TS + 16, y: y * TS + 12 }); c = " "; }
       else if (c === "F") { if (!hard) st.flags.push({ tx: x, ty: y, on: false }); c = " "; }
@@ -408,6 +409,39 @@ function inLamp(l, px, py, t) {
 function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
+  return true;
+}
+// Saw blades (@ runs left and right, % runs up and down): a spinning blade that slides back and forth at
+// SAW_V along its track, which ends at anything solid or at a ! marker. It starts moving right (or down).
+const SAW_V = 150, SAW_R = 12;
+function sawTrack(w) {
+  if (w.a >= 0) return;
+  const ok = (x, y) => !isSolid(x, y) && tileAt(x, y) !== "!";
+  let a = w.vert ? w.ty : w.tx, b = a;
+  if (w.vert) { while (a > 0 && ok(w.tx, a - 1)) a--; while (b < L.H - 1 && ok(w.tx, b + 1)) b++; }
+  else { while (a > 0 && ok(a - 1, w.ty)) a--; while (b < L.W - 1 && ok(b + 1, w.ty)) b++; }
+  w.a = a; w.b = b;
+}
+// Centre of saw w at time t, in pixels.
+function sawAt(w, t) {
+  sawTrack(w);
+  const len = (w.b - w.a) * TS, home = ((w.vert ? w.ty : w.tx) - w.a) * TS;
+  let pos = home;
+  if (len > 0) { const u = (home + SAW_V * t) % (2 * len); pos = u <= len ? u : 2 * len - u; }
+  return w.vert ? { x: w.tx * TS + 16, y: w.a * TS + pos + 16 } : { x: w.a * TS + pos + 16, y: w.ty * TS + 16 };
+}
+const sawBox = (w, t) => { const c = sawAt(w, t); return { x: c.x - SAW_R, y: c.y - SAW_R, w: SAW_R * 2, h: SAW_R * 2 }; };
+// True when a runner leaving column x0 now at v tiles/s (negative = leftward) on the floor below row ty reaches
+// x1 without touching a saw; with jx it jumps once it passes column jx (checked at a few speeds, for tests).
+function sawRun(x0, x1, ty, v, jx = null) {
+  for (const k of [0.9, 1, 1.1]) {
+    const sp = v * k, T = Math.abs((x1 - x0) / sp), tj = jx == null ? Infinity : (jx - x0) / sp;
+    for (let s = 0; s <= T; s += 0.02) {
+      const u = s - tj, dy = u > 0 ? Math.min(0, -JUMP * u + GRAV * u * u / 2) : 0;
+      const box = { x: (x0 + sp * s) * TS, y: ty * TS + 4 + dy, w: PW, h: PH };
+      for (const w of L.saws) if (overlap(box, sawBox(w, runTime + s))) return false;
+    }
+  }
   return true;
 }
 // Arrow traps (R fires right, r fires left): a slot in the wall that looses an arrow every ARROW_T seconds.
@@ -970,6 +1004,7 @@ function updateWorld(dt) {
     if (h && overlap(p, { x: v.tx * TS + 5, y: (v.ty - h) * TS + 4, w: TS - 10, h: h * TS - 4 })) { die("불기둥에 휩싸였다"); return; }
   }
   for (const a of L.arrows) for (const b of arrowBoxes(a, runTime)) if (overlap(p, b)) { die("화살에 맞았다"); return; }
+  for (const w of L.saws) { const b = sawBox(w, runTime); if (overlap(p, { x: b.x + 2, y: b.y + 2, w: b.w - 4, h: b.h - 4 })) { die("톱날에 베였다"); return; } }
   for (const c of L.crushers) {
     const b = crushBox(c, runTime);
     if (crushPos(c.tx, runTime) > 0 && overlap(p, { x: b.x + 2, y: b.y, w: b.w - 4, h: b.h - 2 })) { die("돌절구에 깔렸다"); return; }
@@ -1677,6 +1712,24 @@ function drawLamps(t) {
     ctx.restore();
   }
 }
+function drawSaws(t) {
+  for (const w of L.saws) {
+    sawTrack(w);
+    const c = sawAt(w, runTime);
+    if (Math.abs(c.x - (cam.x + viewW / 2)) > viewW + (w.b - w.a) * TS) continue;
+    ctx.strokeStyle = "rgba(125,141,176,0.35)"; ctx.lineWidth = 2; ctx.beginPath();
+    if (w.vert) { ctx.moveTo(w.tx * TS + 16, w.a * TS + 16); ctx.lineTo(w.tx * TS + 16, w.b * TS + 16); }
+    else { ctx.moveTo(w.a * TS + 16, w.ty * TS + 16); ctx.lineTo(w.b * TS + 16, w.ty * TS + 16); }
+    ctx.stroke();
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(t * 14);
+    ctx.fillStyle = "#c4cad8"; ctx.beginPath();
+    for (let k = 0; k < 16; k++) { const r = k % 2 ? SAW_R - 3 : SAW_R + 2, a = (k / 16) * Math.PI * 2; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#6c7386"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#2a2f3e"; ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
 function drawArrows(t) {
   for (const a of L.arrows) {
     const px = a.tx * TS, py = a.ty * TS;
@@ -2148,6 +2201,7 @@ function render(t) {
     drawVents(t);
     drawCrushers(t);
     drawArrows(t);
+    drawSaws(t);
     drawLamps(t);
     drawFlags(t);
     drawCoins(t);
