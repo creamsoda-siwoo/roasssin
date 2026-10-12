@@ -16,6 +16,7 @@
 // Z z blinking planks (Z is solid for half of every 3 s, z for the other half; they flicker before vanishing)
 // R r arrow trap (a slot in the wall that shoots an arrow right / left every 2 s, at waist height, until it hits something solid)
 // @ % saw blade (slides left-right / up-down along its track, which ends at anything solid or a ! marker)
+// = | moving platform (a plank two tiles wide, marked on its left tile; slides left-right / up-down along its track and carries you)
 export const LEVELS = [
   {
     name: "첫 번째 줄",

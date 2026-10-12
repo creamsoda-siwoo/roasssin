@@ -318,7 +318,7 @@ function buildLevel(i) {
   const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], arrows: [], saws: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], arrows: [], saws: [], movers: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -336,6 +336,7 @@ function buildLevel(i) {
       else if (c === "o") { st.coins.push({ x: x * TS + 16, y: y * TS + 16, taken: false }); c = " "; }
       else if (c === "A") st.vents.push({ tx: x, ty: y });
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
+      else if (c === "=" || c === "|") { st.movers.push({ tx: x, ty: y, vert: c === "|", a: -1, b: -1 }); c = " "; }
       else if (c === "@" || c === "%") { st.saws.push({ tx: x, ty: y, vert: c === "%", a: -1, b: -1 }); c = " "; }
       else if (c === "R" || c === "r") st.arrows.push({ tx: x, ty: y, dir: c === "R" ? 1 : -1, range: -1 });
       else if (c === "L") { st.lamps.push({ x: x * TS + 16, y: y * TS + 12 }); c = " "; }
@@ -410,6 +411,39 @@ function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
   return true;
+}
+// Moving platforms (= slides left and right, | rises and falls): a plank two tiles wide that travels back and
+// forth at MOVER_V along its track (ending at anything solid or a ! marker) and carries whoever stands on it.
+const MOVER_V = 80, MOVER_W = 64, MOVER_H = 12;
+function moverTrack(m) {
+  if (m.a >= 0) return;
+  const ok = (x, y) => !isSolid(x, y) && tileAt(x, y) !== "!";
+  let a = m.vert ? m.ty : m.tx, b = a;
+  if (m.vert) { const ok2 = (y) => ok(m.tx, y) && ok(m.tx + 1, y); while (a > 0 && ok2(a - 1)) a--; while (b < L.H - 2 && ok2(b + 1)) b++; }
+  else { while (a > 0 && ok(a - 1, m.ty)) a--; while (b < L.W - 3 && ok(b + 2, m.ty)) b++; }
+  m.a = a; m.b = b;
+}
+// The plank's box at time t.
+function moverBox(m, t) {
+  moverTrack(m);
+  const len = (m.b - m.a) * TS, home = ((m.vert ? m.ty : m.tx) - m.a) * TS;
+  let pos = home;
+  if (len > 0) { const u = (home + MOVER_V * Math.max(0, t)) % (2 * len); pos = u <= len ? u : 2 * len - u; }
+  return m.vert ? { x: m.tx * TS, y: m.a * TS + pos, w: MOVER_W, h: MOVER_H } : { x: m.a * TS + pos, y: m.ty * TS, w: MOVER_W, h: MOVER_H };
+}
+// For tests: plank i's left edge / top in tiles, and which way it is heading (+1 right or down).
+const mvX = (i) => moverBox(L.movers[i], runTime).x / TS, mvY = (i) => moverBox(L.movers[i], runTime).y / TS;
+const mvD = (i) => { const m = L.movers[i], a = moverBox(m, runTime), b = moverBox(m, runTime + 0.02); return Math.sign(m.vert ? b.y - a.y : b.x - a.x); };
+// Carry a player who stands on a plank by however far it moved this frame.
+function updateMovers(dt) {
+  const p = L.player;
+  for (const m of L.movers) {
+    const o = moverBox(m, runTime - dt), n = moverBox(m, runTime);
+    const riding = p.vy >= 0 && Math.abs(p.y + p.h - o.y) < 2.5 && p.x + p.w > o.x + 1 && p.x < o.x + o.w - 1;
+    if (!riding) continue;
+    if (n.x !== o.x) moveAxis(p, "x", n.x - o.x);
+    if (n.y !== o.y) p.y = n.y - p.h;
+  }
 }
 // Saw blades (@ runs left and right, % runs up and down): a spinning blade that slides back and forth at
 // SAW_V along its track, which ends at anything solid or at a ! marker. It starts moving right (or down).
@@ -542,6 +576,7 @@ function blockers(box, self) {
     for (let tx = x0; tx <= x1; tx++)
       if (isSolid(tx, ty)) out.push({ x: tx * TS, y: ty * TS, w: TS, h: TS, tile: true });
   for (const c of L.crates) if (c !== self && overlap(box, c)) out.push(c);
+  for (const m of L.movers) { const r = moverBox(m, runTime); if (overlap(box, r)) out.push({ ...r, tile: true }); }
   return out;
 }
 // Moves a box along one axis in small steps. Anything the box already overlapped is ignored,
@@ -1712,6 +1747,22 @@ function drawLamps(t) {
     ctx.restore();
   }
 }
+function drawMovers() {
+  for (const m of L.movers) {
+    moverTrack(m);
+    const r = moverBox(m, runTime);
+    if (r.x + r.w < cam.x - TS || r.x > cam.x + viewW + TS) continue;
+    ctx.strokeStyle = "rgba(201,180,138,0.25)"; ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.beginPath();
+    if (m.vert) { ctx.moveTo(m.tx * TS + 32, m.a * TS); ctx.lineTo(m.tx * TS + 32, m.b * TS + MOVER_H); }
+    else { ctx.moveTo(m.a * TS, m.ty * TS + 6); ctx.lineTo((m.b + 2) * TS, m.ty * TS + 6); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (m.vert) { ctx.strokeStyle = "#5b4232"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(r.x + 6, r.y); ctx.lineTo(r.x + 6, m.a * TS - 2); ctx.moveTo(r.x + r.w - 6, r.y); ctx.lineTo(r.x + r.w - 6, m.a * TS - 2); ctx.stroke(); }
+    ctx.fillStyle = "#5a4636"; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = "#8b6a4c"; ctx.fillRect(r.x, r.y, r.w, 3);
+    ctx.fillStyle = "#3a2c22"; for (let k = 1; k < 4; k++) ctx.fillRect(r.x + k * 16, r.y + 3, 1, r.h - 3);
+    ctx.fillStyle = "#c9a45a"; ctx.fillRect(r.x + 3, r.y + 5, 3, 3); ctx.fillRect(r.x + r.w - 6, r.y + 5, 3, 3);
+  }
+}
 function drawSaws(t) {
   for (const w of L.saws) {
     sawTrack(w);
@@ -2202,6 +2253,7 @@ function render(t) {
     drawCrushers(t);
     drawArrows(t);
     drawSaws(t);
+    drawMovers();
     drawLamps(t);
     drawFlags(t);
     drawCoins(t);
@@ -2226,6 +2278,7 @@ function step(dt) {
     runTime += dt;
     save.stats.time = (save.stats.time || 0) + dt; // saved with the next death or clear
     while (ghostRec.length / 2 < runTime * GHOST_HZ) ghostRec.push(Math.round(L.player.x), Math.round(L.player.y));
+    updateMovers(dt);
     updatePlayer(dt);
     updateHook(dt);
     updateCrates(dt);
