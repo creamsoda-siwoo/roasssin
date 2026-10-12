@@ -318,7 +318,7 @@ function buildLevel(i) {
   const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], lamps: [], lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -368,6 +368,8 @@ function solidChar(c) {
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
+    case "Z": return L.bz.Z;
+    case "z": return L.bz.z;
     default: return false;
   }
 }
@@ -405,6 +407,19 @@ function inLamp(l, px, py, t) {
 function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
+  return true;
+}
+// Blinking planks (Z and z): Z is solid for the first half of every BLINK_T seconds and z for the second,
+// so the two sets take turns. A plank flickers for BLINK_WARN seconds before it vanishes, and a set never
+// reappears while you are standing inside one of its tiles.
+const BLINK_T = 3, BLINK_WARN = 0.45;
+const blinkTarget = (ch, t) => ((t % BLINK_T) < BLINK_T / 2) === (ch === "Z");
+const blinkWarn = (ch, t) => { const u = (t + (ch === "Z" ? 0 : BLINK_T / 2)) % BLINK_T; return u >= BLINK_T / 2 - BLINK_WARN && u < BLINK_T / 2; };
+// True when the set `ch` is solid now and stays solid for the next `secs` seconds (on = 1), or stays gone (on = 0) (for tests).
+// With `from`, only the stretch from `from` to `secs` seconds ahead is checked.
+function blinkClear(ch, on, secs, from = 0) {
+  if (!from && L.bz[ch] !== !!on) return false;
+  for (let s = from; s <= secs; s += 0.05) if (blinkTarget(ch, runTime + s) !== !!on) return false;
   return true;
 }
 // Crushers (M): an iron mount in the ceiling with a stone weight that rests up, shakes, slams down to the
@@ -988,6 +1003,21 @@ function openDoor(tx, ty) {
   sfx.door(); toast("문이 열렸다");
 }
 
+function updateBlink() {
+  for (const ch of ["Z", "z"]) {
+    const want = blinkTarget(ch, runTime);
+    if (want === L.bz[ch]) continue;
+    if (want) {
+      const p = L.player, x0 = Math.floor(p.x / TS), x1 = Math.floor((p.x + p.w - 0.001) / TS), y0 = Math.floor(p.y / TS), y1 = Math.floor((p.y + p.h - 0.001) / TS);
+      let inside = false;
+      for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (tileAt(tx, ty) === ch) inside = true;
+      if (inside) continue;
+    }
+    L.bz[ch] = want;
+    const h = L.hook;
+    if (!want && h.state === "attached" && tileAt(h.tx, h.ty) === ch) { h.state = "retract"; h.x = h.ax; h.y = h.ay; }
+  }
+}
 function updateSprings(dt) {
   if (!L.springT) return;
   for (const k in L.springT) { L.springT[k] -= dt; if (L.springT[k] <= 0) delete L.springT[k]; }
@@ -1682,6 +1712,18 @@ function drawDynamicTiles(t) {
       ctx.restore();
       ctx.fillStyle = "#4d5a78"; ctx.fillRect(px, py, TS, 3);
       ctx.fillStyle = "#151926"; ctx.beginPath(); ctx.arc(px + 8, py + 21, 4, 0, Math.PI * 2); ctx.arc(px + 24, py + 21, 4, 0, Math.PI * 2); ctx.fill();
+    } else if (ch === "Z" || ch === "z") {
+      const col = ch === "Z" ? "#e0b45a" : "#5ac8c0";
+      if (L.bz[ch]) {
+        const fl = blinkWarn(ch, runTime) ? 0.45 + 0.45 * (Math.sin(t * 40) > 0 ? 1 : 0) : 1;
+        ctx.globalAlpha = fl;
+        ctx.fillStyle = "#232a3c"; ctx.fillRect(px, py + 2, TS, TS - 4);
+        ctx.fillStyle = col; ctx.fillRect(px, py, TS, 4); ctx.fillRect(px + 3, py + 8, TS - 6, 2); ctx.fillRect(px + 3, py + TS - 8, TS - 6, 2);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.strokeStyle = col; ctx.globalAlpha = 0.3; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+        ctx.strokeRect(px + 2.5, py + 2.5, TS - 5, TS - 5); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
     } else if (ch === "n") {
       ctx.strokeStyle = "rgba(125,141,176,0.3)"; ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
       ctx.strokeRect(px + 2.5, py + 2.5, TS - 5, TS - 5); ctx.setLineDash([]);
@@ -2077,6 +2119,7 @@ function step(dt) {
     updateCrates(dt);
     updateGuards(dt);
     updateCrumble(dt);
+    updateBlink();
     updateSprings(dt);
     updateWorld(dt);
   } else if (mode === "dead") {

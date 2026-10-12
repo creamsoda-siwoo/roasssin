@@ -13,6 +13,7 @@
 // N crumbling floor (solid until you stand on it; cracks, falls away, regrows a few seconds later)
 // > < conveyor (solid floor that carries you right or left; you cannot stand still on it)
 // M crusher (iron ceiling mount; its stone weight shakes, slams down to the floor below, then winches back up)
+// Z z blinking planks (Z is solid for half of every 3 s, z for the other half; they flicker before vanishing)
 export const LEVELS = [
   {
     name: "첫 번째 줄",
