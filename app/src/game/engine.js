@@ -369,7 +369,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -414,6 +414,8 @@ function lightClear(x0, x1, ty, secs) {
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
   return true;
 }
+// Deep snow (~): solid ground that halves your running speed and takes the spring out of your jump.
+const SNOW_RUN = 0.5, SNOW_JUMP = 0.75;
 // Icicles (v): hang under a ceiling. Walk beneath one and it shakes for ICE_SHAKE seconds, then drops; keep
 // moving and it misses you. It shatters on whatever it hits and grows back after ICE_REGROW seconds.
 const ICE_SHAKE = 0.35, ICE_REGROW = 3, ICE_W = 16, ICE_H = 24;
@@ -834,8 +836,10 @@ function updatePlayer(dt) {
   if (p.ground) {
     // ice: slow to start, slow to stop
     const fy = Math.floor((p.y + p.h + 1) / TS);
-    const onIce = tileAt(Math.floor((p.x + p.w / 2) / TS), fy) === "I";
-    p.vx = onIce ? approach(p.vx, ix * RUN * 1.1, (ix ? 520 : 260) * dt) : approach(p.vx, ix * RUN, ACC_G * dt);
+    const under = tileAt(Math.floor((p.x + p.w / 2) / TS), fy), onIce = under === "I";
+    // deep snow (~): half speed, and a jump from it only gets three quarters of the way up
+    p.snowy = under === "~";
+    p.vx = onIce ? approach(p.vx, ix * RUN * 1.1, (ix ? 520 : 260) * dt) : approach(p.vx, ix * RUN * (p.snowy ? SNOW_RUN : 1), ACC_G * dt);
   } else if (hooked) {
     if (ix) {
       const o = handPos();
@@ -859,7 +863,7 @@ function updatePlayer(dt) {
       p.jbuf = 0; sfx.jump();
       burst(p.x + p.w / 2, p.y + p.h, 6, "#e9e3d3", 80);
     } else if (p.coyote > 0) {
-      p.vy = -JUMP; p.coyote = 0; p.jbuf = 0; sfx.jump();
+      p.vy = -JUMP * (p.snowy ? SNOW_JUMP : 1); p.coyote = 0; p.jbuf = 0; sfx.jump();
     } else if (p.boots > 0 && p.airJump) {
       p.vy = -JUMP * 0.95; p.airJump = false; p.jbuf = 0; sfx.jump();
       burst(p.x + p.w / 2, p.y + p.h, 10, "#9fe0ff", 120);
@@ -1701,6 +1705,12 @@ function prerender(st, R) {
       g.fillStyle = "#120c0e";
       for (let k = 0; k < 4; k++) g.fillRect(px + 5 + k * 6, py + 2, 3, 9);
       g.fillStyle = "#6b4b3e"; g.fillRect(px, py, TS, 2);
+    } else if (ch === "~") {
+      g.fillStyle = "#3a4458"; g.fillRect(px, py, TS, TS);
+      g.fillStyle = "#e8f0f8"; g.fillRect(px, py, TS, 9);
+      g.beginPath(); for (let k = 0; k <= 4; k++) g.arc(px + k * 8, py + 9, 4 + hash(x, k) * 2, 0, Math.PI); g.fill();
+      g.fillStyle = "#c4d4e4"; g.fillRect(px, py + 7, TS, 2);
+      g.fillStyle = "rgba(232,240,248,0.25)"; for (let k = 0; k < 3; k++) g.fillRect(px + hash(x * 3, y + k) * 28, py + 14 + k * 6, 3, 2);
     } else if (ch === "I") {
       g.fillStyle = "#2b3f55"; g.fillRect(px, py, TS, TS);
       g.fillStyle = "rgba(190,230,255,0.18)";

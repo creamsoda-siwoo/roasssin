@@ -19,6 +19,7 @@
 // = | moving platform (a plank two tiles wide, marked on its left tile; slides left-right / up-down along its track and carries you)
 // { } crosswind (open air; gusts left / right for 1.6 s of every 3.2 s, all in step, harder than you can run against)
 // v icicle (hangs under a ceiling; walk beneath and it shakes, then drops; regrows a few seconds after it shatters)
+// ~ deep snow (solid ground; half running speed, three-quarter jump height)
 export const LEVELS = [
   {
     name: "첫 번째 줄",
