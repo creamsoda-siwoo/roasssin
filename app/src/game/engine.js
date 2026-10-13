@@ -318,7 +318,7 @@ function buildLevel(i) {
   const def = lvAt(i);
   const rows = def.map;
   const H = rows.length, W = Math.max(...rows.map((r) => r.length));
-  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], arrows: [], saws: [], movers: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
+  const st = { i, W, H, grid: [], crates: [], guards: [], keys: [], plates: [], portals: { O: [], Q: [] }, flags: [], powers: [], coins: [], vents: [], crushers: [], arrows: [], saws: [], movers: [], icicles: [], lamps: [], bz: { Z: true, z: false }, lampSee: 0, chase: null, checkpoint: null, exit: null, flip: false, plateOpen: false, particles: [], crack: {}, regrow: {}, start: { x: 64, y: 64 }, needKey: false, msgCool: 0, sky: null, layer: null };
   for (let y = 0; y < H; y++) {
     const row = [];
     for (let x = 0; x < W; x++) {
@@ -337,6 +337,7 @@ function buildLevel(i) {
       else if (c === "A") st.vents.push({ tx: x, ty: y });
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
       else if (c === "{" || c === "}") st.gusty = true;
+      else if (c === "v") { st.icicles.push({ tx: x, ty: y, st: 0, t: 0, y: 0, vy: 0, floor: -1 }); c = " "; }
       else if (c === "=" || c === "|") { st.movers.push({ tx: x, ty: y, vert: c === "|", a: -1, b: -1 }); c = " "; }
       else if (c === "@" || c === "%") { st.saws.push({ tx: x, ty: y, vert: c === "%", a: -1, b: -1 }); c = " "; }
       else if (c === "R" || c === "r") st.arrows.push({ tx: x, ty: y, dir: c === "R" ? 1 : -1, range: -1 });
@@ -412,6 +413,27 @@ function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
   return true;
+}
+// Icicles (v): hang under a ceiling. Walk beneath one and it shakes for ICE_SHAKE seconds, then drops; keep
+// moving and it misses you. It shatters on whatever it hits and grows back after ICE_REGROW seconds.
+const ICE_SHAKE = 0.35, ICE_REGROW = 3, ICE_W = 16, ICE_H = 24;
+const iceBox = (c) => ({ x: c.tx * TS + 8, y: c.ty * TS + c.y, w: ICE_W, h: ICE_H });
+function updateIcicles(dt) {
+  const p = L.player, cx = p.x + p.w / 2;
+  for (const c of L.icicles) {
+    if (c.floor < 0) { let n = c.ty; while (n < L.H - 1 && !isSolid(c.tx, n + 1)) n++; c.floor = (n + 1) * TS; }
+    if (c.st === 0) {
+      if (mode === "play" && cx > c.tx * TS - 6 && cx < c.tx * TS + TS + 6 && p.y > c.ty * TS) { c.st = 1; c.t = ICE_SHAKE; sfx.crack(); }
+    } else if (c.st === 1) {
+      c.t -= dt; if (c.t <= 0) { c.st = 2; c.vy = 0; }
+    } else if (c.st === 2) {
+      c.vy = Math.min(c.vy + GRAV * dt, MAXFALL); c.y += c.vy * dt;
+      if (c.ty * TS + c.y + ICE_H >= c.floor) { c.st = 3; c.t = ICE_REGROW; burst(c.tx * TS + 16, c.floor - 4, 12, "#cfefff", 160); sfx.crack(); }
+    } else if (c.st === 3) {
+      c.t -= dt;
+      if (c.t <= 0) { c.y = 0; c.vy = 0; if (!overlap(p, iceBox(c))) c.st = 0; }
+    }
+  }
 }
 // Crosswind ({ blows left, } blows right): open air that gusts for GUST_ON seconds out of every GUST_T, all in
 // step; the streaks thicken GUST_WARN seconds before a gust. A gust pushes harder than you can run against it.
@@ -1067,6 +1089,7 @@ function updateWorld(dt) {
     if (h && overlap(p, { x: v.tx * TS + 5, y: (v.ty - h) * TS + 4, w: TS - 10, h: h * TS - 4 })) { die("불기둥에 휩싸였다"); return; }
   }
   for (const a of L.arrows) for (const b of arrowBoxes(a, runTime)) if (overlap(p, b)) { die("화살에 맞았다"); return; }
+  for (const c of L.icicles) if (c.st === 2 && overlap(p, iceBox(c))) { die("고드름에 맞았다"); return; }
   for (const w of L.saws) { const b = sawBox(w, runTime); if (overlap(p, { x: b.x + 2, y: b.y + 2, w: b.w - 4, h: b.h - 4 })) { die("톱날에 베였다"); return; } }
   for (const c of L.crushers) {
     const b = crushBox(c, runTime);
@@ -1775,6 +1798,16 @@ function drawLamps(t) {
     ctx.restore();
   }
 }
+function drawIcicles(t) {
+  for (const c of L.icicles) {
+    if (c.st === 3) continue;
+    const b = iceBox(c);
+    if (b.x + b.w < cam.x - TS || b.x > cam.x + viewW + TS) continue;
+    const sh = c.st === 1 ? Math.sin(t * 70) * 1.5 : 0;
+    ctx.fillStyle = "#cfefff"; ctx.beginPath(); ctx.moveTo(b.x + sh, b.y); ctx.lineTo(b.x + b.w + sh, b.y); ctx.lineTo(b.x + b.w / 2 + sh, b.y + b.h); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#86b8d6"; ctx.beginPath(); ctx.moveTo(b.x + b.w / 2 + sh, b.y); ctx.lineTo(b.x + b.w + sh, b.y); ctx.lineTo(b.x + b.w / 2 + sh, b.y + b.h); ctx.closePath(); ctx.fill();
+  }
+}
 function drawMovers() {
   for (const m of L.movers) {
     moverTrack(m);
@@ -2294,6 +2327,7 @@ function render(t) {
     drawArrows(t);
     drawSaws(t);
     drawMovers();
+    drawIcicles(t);
     drawLamps(t);
     drawFlags(t);
     drawCoins(t);
@@ -2325,6 +2359,7 @@ function step(dt) {
     updateGuards(dt);
     updateCrumble(dt);
     updateBlink();
+    updateIcicles(dt);
     updateSprings(dt);
     updateWorld(dt);
   } else if (mode === "dead") {
