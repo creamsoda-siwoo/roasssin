@@ -369,7 +369,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": case ";": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -413,6 +413,19 @@ function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
   return true;
+}
+// Creaky boards (;): solid floor that groans underfoot. Every guard within CREAK_R tiles turns to face you.
+const CREAK_R = 8, CREAK_COOL = 0.6;
+function creakNoise(p) {
+  p.creakT = CREAK_COOL; sfx.crack();
+  burst(p.x + p.w / 2, p.y + p.h, 8, "#c9a45a", 90);
+  for (const g of L.guards) {
+    if (!g.alive || Math.abs(g.x - p.x) > CREAK_R * TS || Math.abs(g.y - p.y) > 3 * TS) continue;
+    const d = Math.sign(p.x + p.w / 2 - (g.x + g.w / 2)) || g.dir;
+    if (g.kind === "patrol") g.wait = 0;
+    if (g.kind === "watch") g.turnT = WATCH_T;
+    g.dir = d; g.heard = 1.2;
+  }
 }
 // Deep snow (~): solid ground that halves your running speed and takes the spring out of your jump.
 const SNOW_RUN = 0.5, SNOW_JUMP = 0.75;
@@ -828,7 +841,12 @@ function updatePlayer(dt) {
     const ty = Math.floor((p.y + p.h + 1) / TS);
     for (let tx = Math.floor(p.x / TS); tx <= Math.floor((p.x + p.w - 0.01) / TS); tx++)
       if (tileAt(tx, ty) === "N") { const k = tx + "," + ty; if (!(k in L.crack)) { L.crack[k] = FLOOR_CRACK; sfx.crack(); } }
+    // creaky boards (;): stepping on one wakes every guard nearby, and they all turn to look at you
+    let creak = false;
+    for (let tx = Math.floor(p.x / TS); tx <= Math.floor((p.x + p.w - 0.01) / TS); tx++) if (tileAt(tx, ty) === ";") creak = true;
+    if (creak && !(p.creakT > 0)) creakNoise(p);
   }
+  if (p.creakT > 0) p.creakT -= dt;
 
   if (jumpQueued) { p.jbuf = 0.18; jumpQueued = false; } else p.jbuf -= dt;
   if (p.ground) p.coyote = 0.15 * (skin().coyote || 1); else p.coyote -= dt;
@@ -1705,6 +1723,12 @@ function prerender(st, R) {
       g.fillStyle = "#120c0e";
       for (let k = 0; k < 4; k++) g.fillRect(px + 5 + k * 6, py + 2, 3, 9);
       g.fillStyle = "#6b4b3e"; g.fillRect(px, py, TS, 2);
+    } else if (ch === ";") {
+      g.fillStyle = "#4a3628"; g.fillRect(px, py, TS, TS);
+      g.fillStyle = "#6b4e38"; g.fillRect(px, py, TS, 8);
+      g.fillStyle = "#2a1d16"; g.fillRect(px + 10, py, 1, 8); g.fillRect(px + 22, py, 1, 8); g.fillRect(px, py + 8, TS, 1);
+      g.strokeStyle = "rgba(201,164,90,0.5)"; g.lineWidth = 1; g.beginPath(); g.moveTo(px + 3, py + 4); g.lineTo(px + 8, py + 3); g.moveTo(px + 14, py + 5); g.lineTo(px + 19, py + 4); g.stroke();
+      g.fillStyle = "#3a2c22"; for (let k = 0; k < 3; k++) g.fillRect(px + 4 + k * 10, py + 14 + (k % 2) * 6, 6, 2);
     } else if (ch === "~") {
       g.fillStyle = "#3a4458"; g.fillRect(px, py, TS, TS);
       g.fillStyle = "#e8f0f8"; g.fillRect(px, py, TS, 9);
@@ -2160,7 +2184,8 @@ function drawGuards(t) {
     const lg = ctx.createRadialGradient(lx, ly, 1, lx, ly, 14); lg.addColorStop(0, "rgba(255,214,120,0.7)"); lg.addColorStop(1, "rgba(255,214,120,0)");
     ctx.fillStyle = lg; ctx.fillRect(lx - 14, ly - 14, 28, 28);
     ctx.fillStyle = "#ffd47a"; ctx.fillRect(lx - 2.5, ly - 3, 5, 6);
-    if (g.kind === "watch" && g.turnT < 0.6) { ctx.fillStyle = "#ece4cf"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.fillText("?", cx, g.y - 20); }
+    if (g.heard > 0 && g.seeT <= 0.05) { g.heard -= 1 / 60; ctx.fillStyle = "#c9a45a"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.fillText("?!", cx, g.y - 20); }
+    else if (g.kind === "watch" && g.turnT < 0.6) { ctx.fillStyle = "#ece4cf"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.fillText("?", cx, g.y - 20); }
     if (g.seeT > 0.05) {
       ctx.fillStyle = g.seeT >= SEE_LIMIT * 0.6 ? "#d0583f" : "#ffd47a";
       ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", cx, g.y - 20);

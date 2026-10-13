@@ -20,6 +20,7 @@
 // { } crosswind (open air; gusts left / right for 1.6 s of every 3.2 s, all in step, harder than you can run against)
 // v icicle (hangs under a ceiling; walk beneath and it shakes, then drops; regrows a few seconds after it shatters)
 // ~ deep snow (solid ground; half running speed, three-quarter jump height)
+// ; creaky boards (solid floor; stepping on it makes every guard within 8 tiles turn to face you)
 export const LEVELS = [
   {
     name: "첫 번째 줄",
