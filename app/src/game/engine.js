@@ -369,7 +369,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": case ";": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": case ";": case "&": return true;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -413,6 +413,23 @@ function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
   return true;
+}
+// Bells (&): hang one from a beam and strike it with the hook. Every guard within BELL_R tiles turns to face
+// the bell (a watcher keeps staring at it a while), which can turn a guard's back to you.
+const BELL_R = 7;
+function ringBell(tx, ty) {
+  const bx = tx * TS + 16, by = ty * TS + 16;
+  if (!L.rung) L.rung = {};
+  L.rung[tx + "," + ty] = runTime;
+  tone(660, 0.5, "triangle", 0.08); tone(990, 0.6, "sine", 0.04, 0, 0.02);
+  burst(bx, by, 14, "#e0b45a", 140);
+  for (const g of L.guards) {
+    if (!g.alive || Math.abs(g.x + g.w / 2 - bx) > BELL_R * TS || Math.abs(g.y - by) > 4 * TS) continue;
+    g.dir = Math.sign(bx - (g.x + g.w / 2)) || g.dir;
+    if (g.kind === "patrol") g.wait = 0;
+    if (g.kind === "watch") g.turnT = WATCH_T * 2;
+    g.heard = 1.2;
+  }
 }
 // Creaky boards (;): solid floor that groans underfoot. Every guard within CREAK_R tiles turns to face you.
 const CREAK_R = 8, CREAK_COOL = 0.6;
@@ -689,7 +706,7 @@ function testPoint(x, y) {
   for (const c of L.crates) if (inRect(x, y, c)) return { kind: "crate", c };
   for (const g of L.guards) if (g.alive && inRect(x, y, g)) return { kind: "guard", g };
   const tx = Math.floor(x / TS), ty = Math.floor(y / TS), ch = tileAt(tx, ty);
-  if (solidChar(ch)) return { kind: ch === "#" || ch === "C" ? "anchor" : ch === "S" ? "switch" : "steel", tx, ty };
+  if (solidChar(ch)) return { kind: ch === "#" || ch === "C" ? "anchor" : ch === "S" ? "switch" : ch === "&" ? "bell" : "steel", tx, ty };
   return null;
 }
 function probeDir(o, ang) {
@@ -703,7 +720,7 @@ function probeDir(o, ang) {
   }
   return { x: o.x + dx * HOOK_RANGE, y: o.y + dy * HOOK_RANGE, ox: o.x, oy: o.y, dx, dy, hit: null };
 }
-const usefulHit = (h) => !!h && (h.kind === "anchor" || h.kind === "switch" || h.kind === "crate" || (h.kind === "guard" && h.back));
+const usefulHit = (h) => !!h && (h.kind === "anchor" || h.kind === "switch" || h.kind === "bell" || h.kind === "crate" || (h.kind === "guard" && h.back));
 // A fingertip is imprecise, so on touch screens the aim snaps to the nearest useful target within ~16 degrees.
 function probeAim() {
   const o = handPos(), m = mouseWorld();
@@ -808,6 +825,9 @@ function onHookHit(hit) {
     bump("hooks");
     burst(ax, ay, 5, ropeColor(runTime), 90);
     sfx.attach();
+  } else if (hit.kind === "bell") {
+    h.state = "retract";
+    ringBell(hit.tx, hit.ty);
   } else if (hit.kind === "switch") {
     L.flip = !L.flip;
     h.state = "retract";
@@ -1929,11 +1949,22 @@ function drawVents(t) {
     ctx.closePath(); ctx.fill();
   }
 }
+function drawBell(px, py, t, k) {
+  const since = L.rung && L.rung[k] !== undefined ? runTime - L.rung[k] : 9;
+  const sw = since < 1.6 ? Math.sin(since * 14) * 0.5 * (1 - since / 1.6) : 0;
+  ctx.save(); ctx.translate(px + 16, py + 2); ctx.rotate(sw);
+  ctx.fillStyle = "#5b4232"; ctx.fillRect(-2, -2, 4, 6);
+  ctx.fillStyle = "#b8862e"; ctx.beginPath(); ctx.moveTo(-6, 4); ctx.quadraticCurveTo(-7, 18, -13, 24); ctx.lineTo(13, 24); ctx.quadraticCurveTo(7, 18, 6, 4); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#e0b45a"; ctx.fillRect(-12, 22, 24, 3); ctx.fillRect(-4, 6, 3, 12);
+  ctx.fillStyle = "#3a2c22"; ctx.beginPath(); ctx.arc(0, 26, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
 function drawDynamicTiles(t) {
   const x0 = Math.max(0, Math.floor(cam.x / TS) - 1), x1 = Math.min(L.W - 1, Math.ceil((cam.x + viewW) / TS) + 1);
   const y0 = Math.max(0, Math.floor(cam.y / TS) - 1), y1 = Math.min(L.H - 1, Math.ceil((cam.y + viewH) / TS) + 1);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const ch = L.grid[y][x], px = x * TS, py = y * TS;
+    if (ch === "&") { drawBell(px, py, t, x + "," + y); continue; }
     if (ch === "C") {
       const k = x + "," + y, cr = L.crack[k];
       const sh = cr !== undefined ? (Math.random() - 0.5) * 2 * (1.7 - cr) : 0;
@@ -2301,7 +2332,7 @@ function drawAim() {
   let col = "rgba(236,228,207,0.25)", ok = false;
   if (a.hit) {
     const k = a.hit.kind;
-    if (k === "anchor" || k === "switch" || k === "crate" || (k === "guard" && a.hit.back)) { col = ropeColor(runTime); ok = true; }
+    if (k === "anchor" || k === "switch" || k === "bell" || k === "crate" || (k === "guard" && a.hit.back)) { col = ropeColor(runTime); ok = true; }
     else if (k === "guard") col = "rgba(208,88,63,0.9)";
     else col = "rgba(125,141,176,0.7)";
   }
