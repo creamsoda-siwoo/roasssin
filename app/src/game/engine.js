@@ -370,7 +370,7 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": case ";": case "&": case "p": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": case ";": case "&": case "p": case "w": return true;
     case "d": return !L.dOpen;
     case "G": return !L.flip;
     case "g": return L.flip;
@@ -468,10 +468,42 @@ function ringBell(tx, ty) {
   const bx = tx * TS + 16, by = ty * TS + 16;
   if (!L.rung) L.rung = {};
   L.rung[tx + "," + ty] = runTime;
+  bump("bells");
   tone(660, 0.5, "triangle", 0.08); tone(990, 0.6, "sine", 0.04, 0, 0.02);
   burst(bx, by, 14, "#e0b45a", 140);
   for (const g of L.guards) {
     if (!g.alive || Math.abs(g.x + g.w / 2 - bx) > BELL_R * TS || Math.abs(g.y - by) > 4 * TS) continue;
+    g.dir = Math.sign(bx - (g.x + g.w / 2)) || g.dir;
+    if (g.kind === "patrol") g.wait = 0;
+    if (g.kind === "watch") g.turnT = WATCH_T * 2;
+    g.heard = 1.2;
+  }
+}
+// Cracked walls (w): solid, and the hook cannot bite them, but WALL_HITS strikes bring down the whole column
+// of cracked blocks. The crash carries: every guard within WALL_R tiles turns to face it.
+const WALL_HITS = 2, WALL_R = 7;
+function wallColumn(tx, ty) {
+  let y0 = ty, y1 = ty;
+  while (tileAt(tx, y0 - 1) === "w") y0--;
+  while (tileAt(tx, y1 + 1) === "w") y1++;
+  return [y0, y1];
+}
+function hitWall(tx, ty) {
+  const [y0, y1] = wallColumn(tx, ty), k = tx + "," + y0;
+  if (!L.wallHits) L.wallHits = {};
+  L.wallHits[k] = (L.wallHits[k] || 0) + 1;
+  L.wallHitT = L.wallHitT || {}; L.wallHitT[k] = runTime;
+  const bx = tx * TS + 16, by = ty * TS + 16;
+  if (L.wallHits[k] < WALL_HITS) {
+    tone(140, 0.18, "square", 0.06); burst(bx, by, 6, "#8b8f9c", 90);
+    return;
+  }
+  for (let y = y0; y <= y1; y++) { L.grid[y][tx] = " "; burst(bx, y * TS + 16, 10, "#8b8f9c", 170); }
+  sfx.crack(); tone(90, 0.35, "sawtooth", 0.07); buzz(30);
+  bump("walls");
+  const my = (y0 + y1 + 1) / 2 * TS;
+  for (const g of L.guards) {
+    if (!g.alive || Math.abs(g.x + g.w / 2 - bx) > WALL_R * TS || Math.abs(g.y - my) > 4 * TS) continue;
     g.dir = Math.sign(bx - (g.x + g.w / 2)) || g.dir;
     if (g.kind === "patrol") g.wait = 0;
     if (g.kind === "watch") g.turnT = WATCH_T * 2;
@@ -753,7 +785,7 @@ function testPoint(x, y) {
   for (const c of L.crates) if (inRect(x, y, c)) return { kind: "crate", c };
   for (const g of L.guards) if (g.alive && inRect(x, y, g)) return { kind: "guard", g };
   const tx = Math.floor(x / TS), ty = Math.floor(y / TS), ch = tileAt(tx, ty);
-  if (solidChar(ch)) return { kind: ch === "#" || ch === "C" ? "anchor" : ch === "S" ? "switch" : ch === "&" ? "bell" : "steel", tx, ty };
+  if (solidChar(ch)) return { kind: ch === "#" || ch === "C" ? "anchor" : ch === "S" ? "switch" : ch === "&" ? "bell" : ch === "w" ? "wall" : "steel", tx, ty };
   return null;
 }
 function probeDir(o, ang) {
@@ -767,7 +799,7 @@ function probeDir(o, ang) {
   }
   return { x: o.x + dx * HOOK_RANGE, y: o.y + dy * HOOK_RANGE, ox: o.x, oy: o.y, dx, dy, hit: null };
 }
-const usefulHit = (h) => !!h && (h.kind === "anchor" || h.kind === "switch" || h.kind === "bell" || h.kind === "crate" || (h.kind === "guard" && h.back));
+const usefulHit = (h) => !!h && (h.kind === "anchor" || h.kind === "switch" || h.kind === "bell" || h.kind === "wall" || h.kind === "crate" || (h.kind === "guard" && h.back));
 // A fingertip is imprecise, so on touch screens the aim snaps to the nearest useful target within ~16 degrees.
 function probeAim() {
   const o = handPos(), m = mouseWorld();
@@ -875,6 +907,9 @@ function onHookHit(hit) {
   } else if (hit.kind === "bell") {
     h.state = "retract";
     ringBell(hit.tx, hit.ty);
+  } else if (hit.kind === "wall") {
+    h.state = "retract";
+    hitWall(hit.tx, hit.ty);
   } else if (hit.kind === "switch") {
     L.flip = !L.flip;
     h.state = "retract";
@@ -986,7 +1021,7 @@ function updatePlayer(dt) {
   // ladder (l): press up or down inside one to grab it; holding on cancels gravity, and a jump lets go
   const onLadder = !hooked && tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h / 2) / TS)) === "l";
   if (!onLadder) p.latched = false;
-  else if ((up || down) && !p.latched) p.latched = true;
+  else if ((up || down) && !p.latched) { p.latched = true; bump("ladders"); }
   if (p.latched) {
     if (p.jbuf > 0) { p.latched = false; p.vy = -JUMP * 0.8; p.jbuf = 0; sfx.jump(); }
     else p.vy = up ? -CLIMB_V : down ? CLIMB_V : 0;
@@ -1223,7 +1258,7 @@ function updateWorld(dt) {
   // checkpoint flags
   for (const f of L.flags) if (!f.on && overlap(p, { x: f.tx * TS + 6, y: f.ty * TS - 16, w: 20, h: 48 })) {
     for (const o of L.flags) o.on = false;
-    f.on = true; L.checkpoint = { x: f.tx * TS + (TS - PW) / 2, y: f.ty * TS + TS - PH };
+    f.on = true; bump("flags"); L.checkpoint = { x: f.tx * TS + (TS - PW) / 2, y: f.ty * TS + TS - PH };
     sfx.key(); toast("체크포인트"); burst(f.tx * TS + 16, f.ty * TS + 4, 12, "#7fd1c4", 120);
   }
   // keys
@@ -1506,6 +1541,25 @@ const ACHIEVEMENTS = [
   { id: "sr", name: "질주 본능", desc: "스피드런 구간 하나를 끝까지 달린다", goal: 1, val: () => clears(save.sr) + clears(save.srH) + clears(save.srM) },
   { id: "dd100", name: "끈질긴 자객", desc: "100번 쓰러지고도 다시 일어선다", goal: 100, val: () => save.stats.deaths || 0 },
   { id: "abyss", name: "심연을 건넌 자", desc: "초고난도 보너스 스테이지를 깬다", goal: 1, val: () => Object.keys(save.bonus).length },
+  { id: "c100", name: "백 번의 밤", desc: "일반 모드에서 막 100개를 깬다", goal: 100, val: () => clears(save.best) },
+  { id: "c250", name: "반쯤 온 길", desc: "일반 모드에서 막 250개를 깬다", goal: 250, val: () => clears(save.best) },
+  { id: "h150", name: "핏빛 달", desc: "하드 모드에서 막 150개를 깬다", goal: 150, val: () => clears(save.bestH) },
+  { id: "m50", name: "등불 쉰 개", desc: "마스터 모드에서 막 50개를 깬다", goal: 50, val: () => clears(save.bestM) },
+  { id: "s700", name: "별의 강", desc: "별 700개를 모은다", goal: 700, val: () => totalStars() },
+  { id: "s1500", name: "은하수", desc: "별 1500개를 모은다", goal: 1500, val: () => totalStars() },
+  { id: "p50", name: "완벽주의자", desc: "일반 모드에서 별 셋으로 막 50개를 깬다", goal: 50, val: () => Object.values(save.best).filter((r) => (r.stars || 1) >= 3).length },
+  { id: "k1000", name: "밤의 공포", desc: "경비 1000명을 처치한다", goal: 1000, val: () => save.stats.kills || 0 },
+  { id: "o500", name: "금고지기", desc: "금화 500개를 줍는다", goal: 500, val: () => save.stats.coins || 0 },
+  { id: "hk5000", name: "줄 위의 삶", desc: "후크를 5000번 건다", goal: 5000, val: () => save.stats.hooks || 0 },
+  { id: "clean25", name: "그림자 걸음", desc: "죽지 않고 막 25개를 연달아 깬다", goal: 25, val: () => save.stats.cleanBest || 0 },
+  { id: "d30", name: "한 달의 수행", desc: "오늘의 도전을 30일 연속으로 깬다", goal: 30, val: () => save.streak || 0 },
+  { id: "sr5", name: "바람보다 빠르게", desc: "스피드런 구간 5개를 끝까지 달린다", goal: 5, val: () => clears(save.sr) + clears(save.srH) + clears(save.srM) },
+  { id: "dd500", name: "불사의 의지", desc: "500번 쓰러지고도 다시 일어선다", goal: 500, val: () => save.stats.deaths || 0 },
+  { id: "bell50", name: "종지기", desc: "종을 50번 울린다", goal: 50, val: () => save.stats.bells || 0 },
+  { id: "flag100", name: "깃발 순례", desc: "체크포인트 깃발 100개에 닿는다", goal: 100, val: () => save.stats.flags || 0 },
+  { id: "lad100", name: "광부의 손", desc: "사다리를 100번 붙잡는다", goal: 100, val: () => save.stats.ladders || 0 },
+  { id: "wall20", name: "벽 허무는 자", desc: "금 간 벽 20개를 무너뜨린다", goal: 20, val: () => save.stats.walls || 0 },
+  { id: "epi", name: "이야기의 끝", desc: "에필로그를 본다", goal: 1, val: () => (save.story && save.story.end ? 1 : 0) },
 ];
 function checkAchievements() {
   const fresh = ACHIEVEMENTS.filter((a) => !save.ach[a.id] && a.val() >= a.goal);
@@ -2021,12 +2075,26 @@ function drawBell(px, py, t, k) {
   ctx.fillStyle = "#3a2c22"; ctx.beginPath(); ctx.arc(0, 26, 3, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
+function drawCrackedWall(px, py, x, y) {
+  const y0 = wallColumn(x, y)[0], k = x + "," + y0;
+  const hits = (L.wallHits && L.wallHits[k]) || 0, since = L.wallHitT && L.wallHitT[k] !== undefined ? runTime - L.wallHitT[k] : 9;
+  const sh = since < 0.3 ? (Math.random() - 0.5) * 4 * (1 - since / 0.3) : 0;
+  ctx.save(); ctx.translate(sh, 0);
+  ctx.fillStyle = "#4a4f5e"; ctx.fillRect(px, py, TS, TS);
+  ctx.fillStyle = "#5c6274"; ctx.fillRect(px + 1, py + 1, 14, 9); ctx.fillRect(px + 17, py + 1, 14, 9); ctx.fillRect(px + 1, py + 12, 9, 8); ctx.fillRect(px + 12, py + 12, 19, 8); ctx.fillRect(px + 1, py + 22, 18, 9); ctx.fillRect(px + 21, py + 22, 10, 9);
+  ctx.strokeStyle = hits ? "#e0b45a" : "#23262f"; ctx.lineWidth = hits ? 1.6 : 1.2;
+  ctx.beginPath(); ctx.moveTo(px + 16, py); ctx.lineTo(px + 12, py + 9); ctx.lineTo(px + 18, py + 17); ctx.lineTo(px + 13, py + 26); ctx.lineTo(px + 16, py + TS);
+  if (hits) { ctx.moveTo(px + 18, py + 17); ctx.lineTo(px + 27, py + 21); ctx.moveTo(px + 12, py + 9); ctx.lineTo(px + 4, py + 6); }
+  ctx.stroke();
+  ctx.restore();
+}
 function drawDynamicTiles(t) {
   const x0 = Math.max(0, Math.floor(cam.x / TS) - 1), x1 = Math.min(L.W - 1, Math.ceil((cam.x + viewW) / TS) + 1);
   const y0 = Math.max(0, Math.floor(cam.y / TS) - 1), y1 = Math.min(L.H - 1, Math.ceil((cam.y + viewH) / TS) + 1);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const ch = L.grid[y][x], px = x * TS, py = y * TS;
     if (ch === "&") { drawBell(px, py, t, x + "," + y); continue; }
+    if (ch === "w") { drawCrackedWall(px, py, x, y); continue; }
     if (ch === "d") {
       if (!L.dOpen) {
         ctx.fillStyle = "rgba(10,10,20,0.55)"; ctx.fillRect(px, py, TS, TS);
@@ -2413,7 +2481,7 @@ function drawAim() {
   let col = "rgba(236,228,207,0.25)", ok = false;
   if (a.hit) {
     const k = a.hit.kind;
-    if (k === "anchor" || k === "switch" || k === "bell" || k === "crate" || (k === "guard" && a.hit.back)) { col = ropeColor(runTime); ok = true; }
+    if (k === "anchor" || k === "switch" || k === "bell" || k === "wall" || k === "crate" || (k === "guard" && a.hit.back)) { col = ropeColor(runTime); ok = true; }
     else if (k === "guard") col = "rgba(208,88,63,0.9)";
     else col = "rgba(125,141,176,0.7)";
   }
