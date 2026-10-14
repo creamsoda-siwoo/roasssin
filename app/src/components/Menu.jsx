@@ -1,5 +1,6 @@
 import { useEffect, useState, memo } from "react";
 import * as game from "../game/engine.js";
+import { LEVELS } from "../game/levels.js";
 
 const onOff = (on) => (on ? " 켬" : " 끔");
 
@@ -148,6 +149,7 @@ function Menu({ info, shown, touch, muted, install }) {
             {info.stats.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
           </dl>
         </details>
+        <GimmickBook levels={info.levels} />
         <SaveTransfer />
         <details className="fold">
           <summary>조작법</summary>
@@ -243,9 +245,74 @@ function PowerHelp() {
       <dd>삐걱이는 마루 · 밟으면 삐걱 소리가 나서 가까운 경비가 모두 소리 쪽으로 돌아본다. 경비 근처의 마루는 뛰어넘어라</dd>
       <dt><kbd style={{ color: "#e0b45a" }}>🔔</kbd></dt>
       <dd>종 · 갈고리로 종을 치면 가까운 경비가 모두 종 쪽으로 돌아본다. 이쪽을 보는 경비 너머의 종을 쳐서 등을 돌리게 하라</dd>
+      <dt><kbd style={{ color: "#3e7048" }}>✿</kbd></dt>
+      <dd>덤불 · 덤불 속에 서 있으면 경비도 탐조등도 보지 못하고, 경비가 바로 옆을 지나가도 모른다. 지나간 뒤 등 뒤로 나서라</dd>
     </>
   );
 }
 
 // Re-render only when this component's own props change, not on every HUD tick.
 export default memo(Menu);
+
+// Every trap and device in the game, with the stage where it first turns up (found by scanning the maps).
+const GIMMICKS = [
+  ["#", "나무 들보", "갈고리가 걸린다. 매달려 흔들고, 줄을 감아 오르고, 놓으며 날아간다"],
+  ["YU", "잠든 경비", "한쪽만 본다. 등 뒤로 다가가 덮쳐라"],
+  ["S", "스위치", "갈고리로 치면 붉은 문과 청록 문이 뒤바뀐다"],
+  ["C", "썩은 들보", "갈고리를 걸면 곧 부러지고, 잠시 뒤 다시 자란다"],
+  ["K", "열쇠와 잠긴 문", "열쇠를 주워야 잠긴 문이 열린다"],
+  ["B", "상자", "갈고리로 끌어 옮기고, 발판 위에 올려 셔터를 연다"],
+  ["o", "금화", "모두 주워야 출구가 열린다"],
+  ["T", "순찰병", "오가며 앞을 살핀다. 위에서 떨어지거나 등 뒤에서 덮쳐라"],
+  ["V", "파수꾼", "제자리에서 주기적으로 돌아선다. 등을 보일 때 쳐라"],
+  ["O", "순간이동 문", "같은 글자의 다른 문으로 이어진다"],
+  ["I", "얼음", "미끄러워서 늦게 서고 늦게 멈춘다"],
+  ["J", "용수철", "밟으면 높이 솟구친다"],
+  ["W", "기류", "올라타면 위로 떠오른다"],
+  ["F", "깃발", "닿으면 그 자리에서 다시 시작한다"],
+  ["*+$", "비약", "그림자 망토, 바람 장화, 수호 부적"],
+  ["A", "불기둥", "박자에 맞춰 불길이 솟는다"],
+  ["L", "탐조등", "빛줄기에 오래 머물면 들킨다. 처마 그늘에 숨어라"],
+  ["N", "무너지는 바닥", "딛으면 곧 무너지고 잠시 뒤 다시 생긴다"],
+  ["<>", "흐르는 바닥", "올라서면 실려 가고, 그 위에서는 멈출 수 없다"],
+  ["M", "돌절구", "천장에서 바닥까지 내리꽂힌다. 올라가 멈춘 틈에 지나라"],
+  ["Zz", "깜빡이는 발판", "금빛과 청록 발판이 번갈아 나타난다"],
+  ["Rr", "화살 함정", "벽 구멍에서 2초마다 화살이 날아온다"],
+  ["@%", "톱날", "홈을 따라 오간다. 뛰어넘거나 올라간 틈에 지나라"],
+  ["=|", "움직이는 발판", "올라타면 실려 간다. 끝에 멈췄을 때 타고 내려라"],
+  ["{}", "옆바람", "거슬러 걸을 수 없고, 등지고 뛰면 멀리 난다"],
+  ["v", "고드름", "밑을 지나면 떨어진다. 멈추지 마라"],
+  ["~", "눈더미", "걸음은 절반, 점프는 낮게"],
+  [";", "삐걱이는 마루", "밟으면 가까운 경비가 모두 돌아본다"],
+  ["&", "종", "갈고리로 치면 가까운 경비가 종 쪽을 본다"],
+  ["b", "덤불", "숨어 있으면 경비도 탐조등도 보지 못한다"],
+];
+let firstSeen = null;
+function gimmickFirsts() {
+  if (firstSeen) return firstSeen;
+  firstSeen = GIMMICKS.map(([chars]) => LEVELS.findIndex((lv) => lv.map.some((row) => [...chars].some((c) => row.includes(c)))));
+  const chase = LEVELS.findIndex((lv) => lv.chase);
+  firstSeen.chase = chase;
+  return firstSeen;
+}
+function GimmickBook({ levels }) {
+  const firsts = gimmickFirsts();
+  const rows = GIMMICKS.map(([, name, desc], k) => ({ name, desc, first: firsts[k] })).filter((r) => r.first >= 0);
+  if (firsts.chase >= 0) rows.push({ name: "불길 추격", desc: "왼쪽에서 불길이 쫓아온다. 멈추지 말고 달려라", first: firsts.chase });
+  rows.sort((a, b) => a.first - b.first);
+  const open = (r) => levels[r.first] && !levels[r.first].locked;
+  return (
+    <details className="fold">
+      <summary>기믹 도감 {rows.filter(open).length}/{rows.length}</summary>
+      <div className="achgrid" id="gimmickList">
+        {rows.map((r) => (
+          <div key={r.name} className={"ach" + (open(r) ? " done" : "")}>
+            <b>{open(r) ? r.name : "???"} · {r.first + 1}막</b>
+            <small>{open(r) ? r.desc : `${r.first + 1}막에 이르면 알게 된다`}</small>
+            {open(r) && <button type="button" className="srb" onClick={() => game.playLevel(r.first)}>{r.first + 1}막 해 보기</button>}
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}

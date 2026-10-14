@@ -414,6 +414,25 @@ function lightClear(x0, x1, ty, secs) {
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
   return true;
 }
+// Bushes (b): open air you can crouch in. While you stand in one no guard or searchlight can see you, and a
+// guard who walks right through you does not notice. Step out behind him.
+const inBush = (p) => tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h - 6) / TS)) === "b";
+function drawBushes(t) {
+  const x0 = Math.max(0, Math.floor(cam.x / TS) - 1), x1 = Math.min(L.W - 1, Math.ceil((cam.x + viewW) / TS) + 1);
+  const y0 = Math.max(0, Math.floor(cam.y / TS) - 1), y1 = Math.min(L.H - 1, Math.ceil((cam.y + viewH) / TS) + 1);
+  const hid = inBush(L.player);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (L.grid[y][x] !== "b") continue;
+    const px = x * TS, py = y * TS, sw = Math.sin(t * 2 + x) * 1.5;
+    ctx.globalAlpha = hid ? 0.82 : 1;
+    for (let k = 0; k < 5; k++) {
+      const cx = px + 4 + k * 6 + sw * (k % 2 ? 1 : -1), cy = py + 14 + hash(x, y + k) * 8, r = 8 + hash(x + k, y) * 4;
+      ctx.fillStyle = k % 2 ? "#2f5a3a" : "#3e7048"; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = "#24442c"; ctx.fillRect(px, py + 24, TS, 8);
+    ctx.globalAlpha = 1;
+  }
+}
 // Bells (&): hang one from a beam and strike it with the hook. Every guard within BELL_R tiles turns to face
 // the bell (a watcher keeps staring at it a while), which can turn a guard's back to you.
 const BELL_R = 7;
@@ -1019,7 +1038,7 @@ function updateCrates(dt) {
 
 function canSee(g) {
   const p = L.player;
-  if (p.cloak > 0 || p.invul > 0) return false;
+  if (p.cloak > 0 || p.invul > 0 || inBush(p)) return false;
   const ex = g.x + g.w / 2 + g.dir * 4, ey = g.y + 8;
   const pts = [[p.x + p.w / 2, p.y + p.h / 2], [p.x + p.w / 2, p.y + 4]];
   for (const [px, py] of pts) {
@@ -1058,7 +1077,7 @@ function updateGuards(dt) {
       const behind = g.dir * ((p.x + p.w / 2) - (g.x + g.w / 2)) < 0;
       const above = p.vy > 40 && p.y + p.h - g.y < 16;
       if (behind || above || p.cloak > 0) { killGuard(g); if (above) p.vy = -280; }
-      else detected(g);
+      else if (!inBush(p)) detected(g);
     }
   }
 }
@@ -1121,7 +1140,7 @@ function updateWorld(dt) {
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++)
     if (tileAt(tx, ty) === "^" && overlap(p, { x: tx * TS + 4, y: ty * TS + 16, w: TS - 8, h: TS - 16 })) { die("가시에 찔렸다"); return; }
   if (L.lamps.length) {
-    const lit = p.cloak <= 0 && p.invul <= 0 && L.lamps.some((l) => inLamp(l, p.x + p.w / 2, p.y + p.h / 2, runTime) || inLamp(l, p.x + p.w / 2, p.y + 4, runTime));
+    const lit = p.cloak <= 0 && p.invul <= 0 && !inBush(p) && L.lamps.some((l) => inLamp(l, p.x + p.w / 2, p.y + p.h / 2, runTime) || inLamp(l, p.x + p.w / 2, p.y + 4, runTime));
     L.lampSee = lit ? L.lampSee + dt : Math.max(0, L.lampSee - dt * 0.7);
     if (L.lampSee >= (hard ? 0.18 : 0.25)) { sfx.alert(); die("탐조등에 들켰다"); return; }
   }
@@ -2404,6 +2423,7 @@ function render(t) {
     drawRope(t);
     drawGhost(t);
     drawPlayer(t);
+    drawBushes(t);
     drawParticles();
     drawChase(t);
     drawAim();
