@@ -337,6 +337,7 @@ function buildLevel(i) {
       else if (c === "A") st.vents.push({ tx: x, ty: y });
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
       else if (c === "{" || c === "}") st.gusty = true;
+      else if (c === "p") st.hasPlates = true;
       else if (c === "v") { st.icicles.push({ tx: x, ty: y, st: 0, t: 0, y: 0, vy: 0, floor: -1 }); c = " "; }
       else if (c === "=" || c === "|") { st.movers.push({ tx: x, ty: y, vert: c === "|", a: -1, b: -1 }); c = " "; }
       else if (c === "@" || c === "%") { st.saws.push({ tx: x, ty: y, vert: c === "%", a: -1, b: -1 }); c = " "; }
@@ -369,7 +370,8 @@ function tileAt(tx, ty) {
 }
 function solidChar(c) {
   switch (c) {
-    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": case ";": case "&": return true;
+    case "#": case "X": case "D": case "S": case "C": case "J": case "I": case "A": case "N": case ">": case "<": case "M": case "R": case "r": case "~": case ";": case "&": case "p": return true;
+    case "d": return !L.dOpen;
     case "G": return !L.flip;
     case "g": return L.flip;
     case "H": return !L.plateOpen;
@@ -413,6 +415,30 @@ function lightClear(x0, x1, ty, secs) {
   for (const l of L.lamps) for (let s = 0; s <= secs; s += 0.05)
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
   return true;
+}
+// Timed doors (d) and their plates (p): stepping on a plate, or leaving a crate on it, opens every iron door
+// for TIMED_T seconds. A door never shuts on you: it waits until you are clear of it.
+const TIMED_T = 5;
+function updateTimedDoors(dt) {
+  if (!L.hasPlates) return;
+  const p = L.player, onPlate = (b) => {
+    const ty = Math.floor((b.y + b.h + 1) / TS);
+    for (let tx = Math.floor(b.x / TS); tx <= Math.floor((b.x + b.w - 0.01) / TS); tx++) if (tileAt(tx, ty) === "p") return true;
+    return false;
+  };
+  const pressed = (onGround(p) && onPlate(p)) || L.crates.some((c) => c.ground && onPlate(c));
+  const before = L.dTimer || 0;
+  if (pressed) { if (before <= 0) sfx.toggle(); L.dTimer = TIMED_T; }
+  else L.dTimer = before - dt;
+  if (!pressed && before > 0 && Math.floor(before) !== Math.floor(L.dTimer) && before < 3.05) tone(880, 0.05, "square", 0.04);
+  if (L.dTimer > 0) L.dOpen = true;
+  else {
+    let inside = false;
+    for (let ty = Math.floor(p.y / TS); ty <= Math.floor((p.y + p.h - 0.01) / TS); ty++)
+      for (let tx = Math.floor(p.x / TS); tx <= Math.floor((p.x + p.w - 0.01) / TS); tx++) if (tileAt(tx, ty) === "d") inside = true;
+    if (L.dOpen && !inside) sfx.toggle();
+    L.dOpen = inside;
+  }
 }
 // Ladders (l): open air you can climb at CLIMB_V. Run the ladder one tile above the ledge it leads to.
 const CLIMB_V = 150;
@@ -965,6 +991,8 @@ function updatePlayer(dt) {
     if (p.jbuf > 0) { p.latched = false; p.vy = -JUMP * 0.8; p.jbuf = 0; sfx.jump(); }
     else p.vy = up ? -CLIMB_V : down ? CLIMB_V : 0;
     p.vx = approach(p.vx, ix * RUN * 0.7, ACC_G * dt);
+    // with no sideways input, slide onto the middle of the ladder so the hole at the top lets you through
+    if (!ix) { const cx = Math.floor((p.x + p.w / 2) / TS) * TS + (TS - p.w) / 2; moveAxis(p, "x", clamp(cx - p.x, -240 * dt, 240 * dt)); }
   }
 
   // conveyor (> or <): standing on it carries you along on top of your own running
@@ -1999,6 +2027,25 @@ function drawDynamicTiles(t) {
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const ch = L.grid[y][x], px = x * TS, py = y * TS;
     if (ch === "&") { drawBell(px, py, t, x + "," + y); continue; }
+    if (ch === "d") {
+      if (!L.dOpen) {
+        ctx.fillStyle = "rgba(10,10,20,0.55)"; ctx.fillRect(px, py, TS, TS);
+        ctx.fillStyle = "#8a96b4"; ctx.fillRect(px, py, TS, 3); ctx.fillRect(px, py + TS - 3, TS, 3);
+        for (let k = 0; k < 4; k++) ctx.fillRect(px + 3 + k * 8, py, 3, TS);
+      } else {
+        ctx.strokeStyle = "rgba(138,150,180,0.35)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.strokeRect(px + 2.5, py + 2.5, TS - 5, TS - 5); ctx.setLineDash([]);
+        const left = Math.max(0, L.dTimer || 0) / TIMED_T;
+        if (left > 0 && tileAt(x, y - 1) !== "d") { ctx.fillStyle = left < 0.4 ? "#d0583f" : "#e0b45a"; ctx.fillRect(px + 2, py - 6, (TS - 4) * left, 3); }
+      }
+      continue;
+    }
+    if (ch === "p") {
+      ctx.fillStyle = "#3a4458"; ctx.fillRect(px, py, TS, TS);
+      const down = (L.dTimer || 0) > TIMED_T - 0.2;
+      ctx.fillStyle = (L.dTimer || 0) > 0 ? "#e0b45a" : "#8a7a5a"; ctx.fillRect(px + 4, py + (down ? 3 : 0), TS - 8, 5);
+      ctx.fillStyle = "#212839"; ctx.fillRect(px, py + 8, TS, 2);
+      continue;
+    }
     if (ch === "C") {
       const k = x + "," + y, cr = L.crack[k];
       const sh = cr !== undefined ? (Math.random() - 0.5) * 2 * (1.7 - cr) : 0;
@@ -2460,6 +2507,7 @@ function step(dt) {
     updateGuards(dt);
     updateCrumble(dt);
     updateBlink();
+    updateTimedDoors(dt);
     updateIcicles(dt);
     updateSprings(dt);
     updateWorld(dt);

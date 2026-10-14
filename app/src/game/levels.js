@@ -24,6 +24,7 @@
 // & bell (solid; strike it with the hook and every guard within 7 tiles turns to face it)
 // b bush (open air; while you stand in it no guard or searchlight sees you, and guards walk past without noticing)
 // l ladder (open air; press up/down to grab it and climb; run it one tile above the ledge it serves)
+// p pressure plate (solid) / d iron door: standing on a plate (or a crate on it) opens every iron door for 5 s
 export const LEVELS = [
   {
     name: "첫 번째 줄",
