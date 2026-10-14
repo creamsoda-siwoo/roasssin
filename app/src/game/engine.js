@@ -414,6 +414,8 @@ function lightClear(x0, x1, ty, secs) {
     for (let x = x0; x <= x1 + 0.01; x += 0.25) if (inLamp(l, x * TS + 16, ty * TS + 14, runTime + s)) return false;
   return true;
 }
+// Ladders (l): open air you can climb at CLIMB_V. Run the ladder one tile above the ledge it leads to.
+const CLIMB_V = 150;
 // Bushes (b): open air you can crouch in. While you stand in one no guard or searchlight can see you, and a
 // guard who walks right through you does not notice. Step out behind him.
 const inBush = (p) => tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h - 6) / TS)) === "b";
@@ -954,6 +956,16 @@ function updatePlayer(dt) {
   if (inWind) { p.vy = approach(p.vy, -WIND_UP, (p.vy > 0 ? WIND_ACC * 3 : WIND_ACC) * dt); p.boost = true; }
   // with no input the air column holds you in place instead of letting momentum carry you out
   if (inWind && !ix && !hooked) p.vx = approach(p.vx, 0, 1400 * dt);
+
+  // ladder (l): press up or down inside one to grab it; holding on cancels gravity, and a jump lets go
+  const onLadder = !hooked && tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h / 2) / TS)) === "l";
+  if (!onLadder) p.latched = false;
+  else if ((up || down) && !p.latched) p.latched = true;
+  if (p.latched) {
+    if (p.jbuf > 0) { p.latched = false; p.vy = -JUMP * 0.8; p.jbuf = 0; sfx.jump(); }
+    else p.vy = up ? -CLIMB_V : down ? CLIMB_V : 0;
+    p.vx = approach(p.vx, ix * RUN * 0.7, ACC_G * dt);
+  }
 
   // conveyor (> or <): standing on it carries you along on top of your own running
   // and leaving it (by jumping or running off the end) keeps the belt's speed as momentum
@@ -1762,6 +1774,9 @@ function prerender(st, R) {
       g.fillStyle = "#120c0e";
       for (let k = 0; k < 4; k++) g.fillRect(px + 5 + k * 6, py + 2, 3, 9);
       g.fillStyle = "#6b4b3e"; g.fillRect(px, py, TS, 2);
+    } else if (ch === "l") {
+      g.fillStyle = "#6b4e38"; g.fillRect(px + 6, py, 3, TS); g.fillRect(px + TS - 9, py, 3, TS);
+      g.fillStyle = "#8b6a4c"; for (let k = 0; k < 4; k++) g.fillRect(px + 6, py + 4 + k * 8, TS - 12, 3);
     } else if (ch === ";") {
       g.fillStyle = "#4a3628"; g.fillRect(px, py, TS, TS);
       g.fillStyle = "#6b4e38"; g.fillRect(px, py, TS, 8);
