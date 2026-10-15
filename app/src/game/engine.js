@@ -338,6 +338,7 @@ function buildLevel(i) {
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
       else if (c === "{" || c === "}") st.gusty = true;
       else if (c === "p") st.hasPlates = true;
+      else if (c === "u" || c === "y") { (st.trolleys = st.trolleys || []).push({ hx: x, ty: y, dir: c === "u" ? 1 : -1 }); c = "-"; }
       else if (c === "v") { st.icicles.push({ tx: x, ty: y, st: 0, t: 0, y: 0, vy: 0, floor: -1 }); c = " "; }
       else if (c === "=" || c === "|") { st.movers.push({ tx: x, ty: y, vert: c === "|", a: -1, b: -1 }); c = " "; }
       else if (c === "@" || c === "%") { st.saws.push({ tx: x, ty: y, vert: c === "%", a: -1, b: -1 }); c = " "; }
@@ -477,6 +478,45 @@ function ringBell(tx, ty) {
     if (g.kind === "patrol") g.wait = 0;
     if (g.kind === "watch") g.turnT = WATCH_T * 2;
     g.heard = 1.2;
+  }
+}
+// Pulley trolleys (u rolls right, y rolls left): a block on an overhead rail (-). Hook it and it rolls to the far
+// end of its rail, carrying you; let go and it waits a moment, then rolls back home.
+const TROLLEY_V = 150, TROLLEY_BACK = 90, TROLLEY_WAIT = 0.8;
+function updateTrolleys(dt) {
+  if (!L.trolleys) return;
+  const h = L.hook, p = L.player;
+  for (const t of L.trolleys) {
+    if (t.x === undefined) {
+      t.x = t.hx * TS; t.y = t.ty * TS; t.home = t.x; t.idle = 0;
+      let e = t.hx; while (tileAt(e + t.dir, t.ty) === "-") e += t.dir;
+      t.end = e * TS;
+    }
+    const on = h.state === "attached" && h.trolley === t;
+    t.idle = on ? 0 : t.idle + dt;
+    const goal = on ? t.end : t.idle > TROLLEY_WAIT ? t.home : t.x;
+    const step = clamp(goal - t.x, -(on ? TROLLEY_V : TROLLEY_BACK) * dt, (on ? TROLLEY_V : TROLLEY_BACK) * dt);
+    t.x += step; t.moving = Math.abs(step) > 0.01;
+    if (on) {
+      h.ax += step;
+      if (!p.ground && t.moving) p.vx += (t.dir * TROLLEY_V - p.vx) * Math.min(1, 3 * dt);
+    }
+  }
+}
+function drawTrolleys(t) {
+  if (!L.trolleys) return;
+  for (const tr of L.trolleys) {
+    if (tr.x === undefined) continue;
+    const px = tr.x, py = tr.y, spin = tr.moving ? t * 12 * tr.dir : 0;
+    ctx.fillStyle = "#3a3f4e"; ctx.fillRect(px + 6, py + 6, TS - 12, 14);
+    for (const wx of [px + 10, px + 22]) {
+      ctx.save(); ctx.translate(wx, py + 4); ctx.rotate(spin);
+      ctx.fillStyle = "#8a96b4"; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#2a2f3c"; ctx.fillRect(-1, -4, 2, 8);
+      ctx.restore();
+    }
+    ctx.fillStyle = "#c9a45a"; ctx.fillRect(px + 14, py + 20, 4, 4);
+    ctx.strokeStyle = "#c9a45a"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px + 16, py + 26, 3, 0, Math.PI * 2); ctx.stroke();
   }
 }
 // Cracked walls (w): solid, and the hook cannot bite them, but WALL_HITS strikes bring down the whole column
@@ -783,6 +823,7 @@ function mouseWorld() { return { x: mouse.sx / scale + cam.x, y: mouse.sy / scal
 
 function testPoint(x, y) {
   for (const c of L.crates) if (inRect(x, y, c)) return { kind: "crate", c };
+  if (L.trolleys) for (const t of L.trolleys) if (inRect(x, y, { x: t.x + 2, y: t.y + 2, w: TS - 4, h: TS - 2 })) return { kind: "trolley", t };
   for (const g of L.guards) if (g.alive && inRect(x, y, g)) return { kind: "guard", g };
   const tx = Math.floor(x / TS), ty = Math.floor(y / TS), ch = tileAt(tx, ty);
   if (solidChar(ch)) return { kind: ch === "#" || ch === "C" ? "anchor" : ch === "S" ? "switch" : ch === "&" ? "bell" : ch === "w" ? "wall" : "steel", tx, ty };
@@ -799,7 +840,7 @@ function probeDir(o, ang) {
   }
   return { x: o.x + dx * HOOK_RANGE, y: o.y + dy * HOOK_RANGE, ox: o.x, oy: o.y, dx, dy, hit: null };
 }
-const usefulHit = (h) => !!h && (h.kind === "anchor" || h.kind === "switch" || h.kind === "bell" || h.kind === "wall" || h.kind === "crate" || (h.kind === "guard" && h.back));
+const usefulHit = (h) => !!h && (h.kind === "anchor" || h.kind === "trolley" || h.kind === "switch" || h.kind === "bell" || h.kind === "wall" || h.kind === "crate" || (h.kind === "guard" && h.back));
 // A fingertip is imprecise, so on touch screens the aim snaps to the nearest useful target within ~16 degrees.
 function probeAim() {
   const o = handPos(), m = mouseWorld();
@@ -840,7 +881,7 @@ function fireAuto() {
   if (!a) { sfx.clank(); return; }
   const h = L.hook, o = handPos();
   if (h.state === "pulling" && h.crate) h.crate.pulled = false;
-  Object.assign(h, { state: "flying", x: o.x, y: o.y, dx: a.dx, dy: a.dy, dist: 0, crate: null, ox: o.x });
+  Object.assign(h, { state: "flying", x: o.x, y: o.y, dx: a.dx, dy: a.dy, dist: 0, crate: null, ox: o.x, trolley: null });
   sfx.fire();
 }
 function fireHook() {
@@ -903,6 +944,13 @@ function onHookHit(hit) {
     h.len = clamp(Math.hypot(o.x - ax, o.y - ay), ROPE_MIN, ROPE_MAX);
     bump("hooks");
     burst(ax, ay, 5, ropeColor(runTime), 90);
+    sfx.attach();
+  } else if (hit.kind === "trolley") {
+    const t = hit.t;
+    Object.assign(h, { state: "attached", ax: t.x + 16, ay: t.y + 26, tx: -1, ty: -1, trolley: t });
+    h.len = clamp(Math.hypot(o.x - h.ax, o.y - h.ay), ROPE_MIN, ROPE_MAX);
+    bump("hooks"); bump("trolleys");
+    burst(h.ax, h.ay, 5, ropeColor(runTime), 90);
     sfx.attach();
   } else if (hit.kind === "bell") {
     h.state = "retract";
@@ -1559,6 +1607,7 @@ const ACHIEVEMENTS = [
   { id: "flag100", name: "깃발 순례", desc: "체크포인트 깃발 100개에 닿는다", goal: 100, val: () => save.stats.flags || 0 },
   { id: "lad100", name: "광부의 손", desc: "사다리를 100번 붙잡는다", goal: 100, val: () => save.stats.ladders || 0 },
   { id: "wall20", name: "벽 허무는 자", desc: "금 간 벽 20개를 무너뜨린다", goal: 20, val: () => save.stats.walls || 0 },
+  { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
   { id: "epi", name: "이야기의 끝", desc: "에필로그를 본다", goal: 1, val: () => (save.story && save.story.end ? 1 : 0) },
 ];
 function checkAchievements() {
@@ -1856,6 +1905,9 @@ function prerender(st, R) {
       g.fillStyle = "#120c0e";
       for (let k = 0; k < 4; k++) g.fillRect(px + 5 + k * 6, py + 2, 3, 9);
       g.fillStyle = "#6b4b3e"; g.fillRect(px, py, TS, 2);
+    } else if (ch === "-") {
+      g.fillStyle = "#5c6274"; g.fillRect(px, py, TS, 3); g.fillStyle = "#2a2f3c"; g.fillRect(px, py + 3, TS, 1);
+      if (x % 3 === 0) { g.fillStyle = "#4a4f5e"; g.fillRect(px + 14, py - 4, 4, 4); }
     } else if (ch === "l") {
       g.fillStyle = "#6b4e38"; g.fillRect(px + 6, py, 3, TS); g.fillRect(px + TS - 9, py, 3, TS);
       g.fillStyle = "#8b6a4c"; for (let k = 0; k < 4; k++) g.fillRect(px + 6, py + 4 + k * 8, TS - 12, 3);
@@ -2481,7 +2533,7 @@ function drawAim() {
   let col = "rgba(236,228,207,0.25)", ok = false;
   if (a.hit) {
     const k = a.hit.kind;
-    if (k === "anchor" || k === "switch" || k === "bell" || k === "wall" || k === "crate" || (k === "guard" && a.hit.back)) { col = ropeColor(runTime); ok = true; }
+    if (k === "anchor" || k === "trolley" || k === "switch" || k === "bell" || k === "wall" || k === "crate" || (k === "guard" && a.hit.back)) { col = ropeColor(runTime); ok = true; }
     else if (k === "guard") col = "rgba(208,88,63,0.9)";
     else col = "rgba(125,141,176,0.7)";
   }
@@ -2554,6 +2606,7 @@ function render(t) {
     drawGhost(t);
     drawPlayer(t);
     drawBushes(t);
+    drawTrolleys(t);
     drawParticles();
     drawChase(t);
     drawAim();
@@ -2576,6 +2629,7 @@ function step(dt) {
     updateCrumble(dt);
     updateBlink();
     updateTimedDoors(dt);
+    updateTrolleys(dt);
     updateIcicles(dt);
     updateSprings(dt);
     updateWorld(dt);
