@@ -445,6 +445,29 @@ function updateTimedDoors(dt) {
 const CLIMB_V = 150;
 // Bushes (b): open air you can crouch in. While you stand in one no guard or searchlight can see you, and a
 // guard who walks right through you does not notice. Step out behind him.
+// Poison fog (f): open air. Inside it no guard or searchlight sees you, but you hold your breath:
+// FOG_T seconds in the fog kills you, and breath comes back FOG_BACK times as fast once you are out.
+const FOG_T = 1.8, FOG_BACK = 1.5;
+const inFog = (p) => tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h / 2) / TS)) === "f";
+function drawFog(t) {
+  const x0 = Math.max(0, Math.floor(cam.x / TS) - 1), x1 = Math.min(L.W - 1, Math.ceil((cam.x + viewW) / TS) + 1);
+  const y0 = Math.max(0, Math.floor(cam.y / TS) - 1), y1 = Math.min(L.H - 1, Math.ceil((cam.y + viewH) / TS) + 1);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (L.grid[y][x] !== "f") continue;
+    const px = x * TS, py = y * TS;
+    ctx.fillStyle = "rgba(96,150,70,0.34)"; ctx.fillRect(px, py, TS, TS);
+    for (let k = 0; k < 2; k++) {
+      const cx = px + 16 + Math.sin(t * 0.9 + x * 1.7 + k * 2.1) * 9, cy = py + 16 + Math.cos(t * 0.7 + y * 1.3 + k) * 7;
+      ctx.fillStyle = "rgba(140,190,90,0.22)"; ctx.beginPath(); ctx.arc(cx, cy, 11 + k * 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  const p = L.player;
+  if (p.fog > 0.05 && mode === "play") {
+    const left = Math.max(0, 1 - p.fog / FOG_T), bx = p.x + p.w / 2 - 14, by = p.y - 12;
+    ctx.fillStyle = "rgba(10,12,20,0.7)"; ctx.fillRect(bx - 1, by - 1, 30, 5);
+    ctx.fillStyle = left < 0.35 ? "#d0583f" : "#9fd07a"; ctx.fillRect(bx, by, 28 * left, 3);
+  }
+}
 const inBush = (p) => tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h - 6) / TS)) === "b";
 function drawBushes(t) {
   const x0 = Math.max(0, Math.floor(cam.x / TS) - 1), x1 = Math.min(L.W - 1, Math.ceil((cam.x + viewW) / TS) + 1);
@@ -1161,7 +1184,7 @@ function updateCrates(dt) {
 
 function canSee(g) {
   const p = L.player;
-  if (p.cloak > 0 || p.invul > 0 || inBush(p)) return false;
+  if (p.cloak > 0 || p.invul > 0 || inBush(p) || inFog(p)) return false;
   const ex = g.x + g.w / 2 + g.dir * 4, ey = g.y + 8;
   const pts = [[p.x + p.w / 2, p.y + p.h / 2], [p.x + p.w / 2, p.y + 4]];
   for (const [px, py] of pts) {
@@ -1262,8 +1285,15 @@ function updateWorld(dt) {
   const x0 = Math.floor(p.x / TS), x1 = Math.floor((p.x + p.w) / TS), y0 = Math.floor(p.y / TS), y1 = Math.floor((p.y + p.h) / TS);
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++)
     if (tileAt(tx, ty) === "^" && overlap(p, { x: tx * TS + 4, y: ty * TS + 16, w: TS - 8, h: TS - 16 })) { die("가시에 찔렸다"); return; }
+  if (inFog(p)) {
+    p.fog = (p.fog || 0) + dt; p.wasFog = true;
+    if (p.fog >= FOG_T) { die("독안개를 들이마셨다"); return; }
+  } else {
+    if (p.wasFog) { p.wasFog = false; bump("fogs"); }
+    if (p.fog > 0) p.fog = Math.max(0, p.fog - dt * FOG_BACK);
+  }
   if (L.lamps.length) {
-    const lit = p.cloak <= 0 && p.invul <= 0 && !inBush(p) && L.lamps.some((l) => inLamp(l, p.x + p.w / 2, p.y + p.h / 2, runTime) || inLamp(l, p.x + p.w / 2, p.y + 4, runTime));
+    const lit = p.cloak <= 0 && p.invul <= 0 && !inBush(p) && !inFog(p) && L.lamps.some((l) => inLamp(l, p.x + p.w / 2, p.y + p.h / 2, runTime) || inLamp(l, p.x + p.w / 2, p.y + 4, runTime));
     L.lampSee = lit ? L.lampSee + dt : Math.max(0, L.lampSee - dt * 0.7);
     if (L.lampSee >= (hard ? 0.18 : 0.25)) { sfx.alert(); die("탐조등에 들켰다"); return; }
   }
@@ -1462,7 +1492,7 @@ const POWER = {
 };
 function respawnAtCheckpoint() {
   const p = L.player, c = L.checkpoint;
-  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0, carry: 0 });
+  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, fog: 0, wasFog: false, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0, carry: 0 });
   for (const pw of L.powers) pw.taken = false;
   if (L.chase) L.chase.x = c.x - 200;
   for (const k of p.scarf) { k.x = p.x + p.w / 2; k.y = p.y + 8; }
@@ -1608,6 +1638,7 @@ const ACHIEVEMENTS = [
   { id: "lad100", name: "광부의 손", desc: "사다리를 100번 붙잡는다", goal: 100, val: () => save.stats.ladders || 0 },
   { id: "wall20", name: "벽 허무는 자", desc: "금 간 벽 20개를 무너뜨린다", goal: 20, val: () => save.stats.walls || 0 },
   { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
+  { id: "fog50", name: "숨 참는 자", desc: "독안개를 50번 무사히 빠져나온다", goal: 50, val: () => save.stats.fogs || 0 },
   { id: "epi", name: "이야기의 끝", desc: "에필로그를 본다", goal: 1, val: () => (save.story && save.story.end ? 1 : 0) },
 ];
 function checkAchievements() {
@@ -2606,6 +2637,7 @@ function render(t) {
     drawGhost(t);
     drawPlayer(t);
     drawBushes(t);
+    drawFog(t);
     drawTrolleys(t);
     drawParticles();
     drawChase(t);
