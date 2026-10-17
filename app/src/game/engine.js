@@ -910,6 +910,10 @@ function fireAuto() {
 function fireHook() {
   const h = L.hook, o = handPos(), m = mouseWorld();
   if (Math.hypot(m.x - o.x, m.y - o.y) < 2) return;
+  if (L.hooksLeft != null) {
+    if (L.hooksLeft <= 0) { if (L.msgCool <= 0) { toast("갈고리를 다 썼다", true); L.msgCool = 1.5; } return; }
+    L.hooksLeft--;
+  }
   const a = probeAim();
   if (h.state === "pulling" && h.crate) h.crate.pulled = false;
   Object.assign(h, { state: "flying", x: o.x, y: o.y, dx: a.dx, dy: a.dy, dist: 0, crate: null, ox: o.x });
@@ -1230,6 +1234,7 @@ function updateGuards(dt) {
 
 function killGuard(g) {
   if (!g.alive) return;
+  if (L.spare) { die("불살의 맹세를 어겼다"); return; }
   g.alive = false; g.deadT = 0; bump("kills");
   burst(g.x + g.w / 2, g.y + 10, 18, "#8f2a2a", 220);
   burst(g.x + g.w / 2, g.y + 10, 8, "#e9e3d3", 160);
@@ -1354,7 +1359,7 @@ function updateWorld(dt) {
   L.msgCool -= dt;
   if (L.exit && overlap(p, L.exit)) {
     const coinsLeft = L.coins.filter((c) => !c.taken).length;
-    if (L.guards.some((g) => g.alive)) {
+    if (!L.spare && L.guards.some((g) => g.alive)) {
       if (L.msgCool <= 0) { toast("아직 경비가 남아 있다", true); L.msgCool = 2; }
     } else if (coinsLeft) {
       if (L.msgCool <= 0) { toast(`금화가 ${coinsLeft}개 남았다`, true); L.msgCool = 2; }
@@ -1439,6 +1444,13 @@ function startLevel(i, keepStats) {
   cur = i;
   L = buildLevel(i);
   if (skin().shield) L.player.shield = true;
+  // stage rules: spare (no guard may be harmed), hooks (a fixed number of hook throws), limit (seconds to reach the exit)
+  const rule = lvAt(i);
+  L.spare = !!rule.spare; L.hooksLeft = rule.hooks != null ? rule.hooks : null; L.limit = rule.limit || 0; L.limT = 0;
+  if (!keepStats && (L.spare || L.hooksLeft != null || L.limit)) {
+    const rs = [L.spare && "불살 · 경비를 해치면 실패", L.hooksLeft != null && `갈고리 ${L.hooksLeft}번`, L.limit && `제한 시간 ${L.limit}초`].filter(Boolean);
+    setTimeout(() => toast("이 막의 규칙 · " + rs.join(" · ")), 900);
+  }
   if (!keepStats) {
     runTime = 0; runDeaths = 0; showCard(); ghostRec = [];
     const g = ghosts[ghostId(i)];
@@ -1639,6 +1651,8 @@ const ACHIEVEMENTS = [
   { id: "wall20", name: "벽 허무는 자", desc: "금 간 벽 20개를 무너뜨린다", goal: 20, val: () => save.stats.walls || 0 },
   { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
   { id: "fog50", name: "숨 참는 자", desc: "독안개를 50번 무사히 빠져나온다", goal: 50, val: () => save.stats.fogs || 0 },
+  { id: "spare", name: "칼을 거둔 자", desc: "불살 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.spare).length, val: () => LEVELS.reduce((n, l, i) => n + (l.spare && save.best[i] ? 1 : 0), 0) },
+  { id: "clock", name: "시간의 주인", desc: "제한 시간 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.limit).length, val: () => LEVELS.reduce((n, l, i) => n + (l.limit && save.best[i] ? 1 : 0), 0) },
   { id: "epi", name: "이야기의 끝", desc: "에필로그를 본다", goal: 1, val: () => (save.story && save.story.end ? 1 : 0) },
 ];
 function checkAchievements() {
@@ -1839,7 +1853,10 @@ function updateHUD() {
     chips.push([`열쇠 ${got}/${total}`, !doorsLeft]);
   }
   if (L.plates.length) chips.push([`발판 ${L.plates.filter((q) => q.pressed).length}/${L.plates.length}`, L.plateOpen]);
-  if (L.guards.length) { const dead = L.guards.filter((g) => !g.alive).length; chips.push([`경비 처치 ${dead}/${L.guards.length}`, dead === L.guards.length]); }
+  if (L.spare) chips.push(["불살 · 아무도 해치지 마라", false]);
+  else if (L.guards.length) { const dead = L.guards.filter((g) => !g.alive).length; chips.push([`경비 처치 ${dead}/${L.guards.length}`, dead === L.guards.length]); }
+  if (L.hooksLeft != null) chips.push([`갈고리 ${L.hooksLeft}번 남음`, L.hooksLeft > 0]);
+  if (L.limit) { const left = Math.max(0, L.limit - L.limT); chips.push([`남은 시간 ${Math.ceil(left)}초`, left > 5]); }
   const q = L.player;
   if (q.cloak > 0) chips.push([`망토 ${Math.ceil(q.cloak)}`, true]);
   if (q.boots > 0) chips.push([`신발 ${Math.ceil(q.boots)}`, true]);
@@ -2661,6 +2678,7 @@ function step(dt) {
     updateCrumble(dt);
     updateBlink();
     updateTimedDoors(dt);
+    if (L.limit && mode === "play") { L.limT += dt; if (L.limT >= L.limit) die("시간이 다 됐다"); }
     updateTrolleys(dt);
     updateIcicles(dt);
     updateSprings(dt);
