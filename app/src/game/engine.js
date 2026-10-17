@@ -338,6 +338,11 @@ function buildLevel(i) {
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
       else if (c === "{" || c === "}") st.gusty = true;
       else if (c === "p") st.hasPlates = true;
+      else if (c === "k" || c === "q") {
+        st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: c === "q" ? 1 : -1, kind: "static", target: true, alive: true, wait: 0, seeT: 0, turnT: WATCH_T, anim: hash(x, y) * 10, deadT: 0, alert: 0 });
+        c = " ";
+      }
+      else if (c === "j") { st.papers = { x: x * TS + 16, y: y * TS + 18, taken: false }; c = " "; }
       else if (c === "u" || c === "y") { (st.trolleys = st.trolleys || []).push({ hx: x, ty: y, dir: c === "u" ? 1 : -1 }); c = "-"; }
       else if (c === "v") { st.icicles.push({ tx: x, ty: y, st: 0, t: 0, y: 0, vy: 0, floor: -1 }); c = " "; }
       else if (c === "=" || c === "|") { st.movers.push({ tx: x, ty: y, vert: c === "|", a: -1, b: -1 }); c = " "; }
@@ -1234,7 +1239,7 @@ function updateGuards(dt) {
 
 function killGuard(g) {
   if (!g.alive) return;
-  if (L.spare) { die("불살의 맹세를 어겼다"); return; }
+  if (L.spare && !g.target) { die(L.guards.some((q) => q.target) ? "표적이 아닌 자를 해쳤다" : "불살의 맹세를 어겼다"); return; }
   g.alive = false; g.deadT = 0; bump("kills");
   burst(g.x + g.w / 2, g.y + 10, 18, "#8f2a2a", 220);
   burst(g.x + g.w / 2, g.y + 10, 8, "#e9e3d3", 160);
@@ -1322,12 +1327,25 @@ function updateWorld(dt) {
     const left = L.coins.filter((q) => !q.taken).length;
     toast(left ? `금화 ${L.coins.length - left}/${L.coins.length}` : "금화를 모두 모았다 · 출구가 열렸다");
   }
-  // chasing fire
+  // stolen papers: taking them sets the fortress alight behind you (level.escape = the fire's speed)
+  const pp = L.papers;
+  if (pp && !pp.taken && Math.hypot(p.x + p.w / 2 - pp.x, p.y + p.h / 2 - pp.y) < 24) {
+    pp.taken = true; sfx.key(); buzz(40); burst(pp.x, pp.y, 18, "#e8d8a8", 160);
+    const v = (lvAt(cur).escape || 110) * [1, 1.15, 1.3][diff];
+    L.chase = { x: p.x + p.w + 260, v, dir: -1 };
+    toast("문서를 손에 넣었다 · 경보! 불길이 번진다", true);
+  }
+  // chasing fire (dir 1 sweeps in from the left, dir -1 from the right)
   if (L.chase) {
     const ch = L.chase;
     // never fall too far behind the player, so idling is never safe
-    ch.x = Math.max(ch.x + ch.v * dt, p.x - 360);
-    if (p.x + 4 < ch.x) { die("불길에 휩싸였다"); return; }
+    if (ch.dir === -1) {
+      ch.x = Math.min(ch.x - ch.v * dt, p.x + p.w + 360);
+      if (p.x + p.w - 4 > ch.x) { die("불길에 휩싸였다"); return; }
+    } else {
+      ch.x = Math.max(ch.x + ch.v * dt, p.x - 360);
+      if (p.x + 4 < ch.x) { die("불길에 휩싸였다"); return; }
+    }
   }
   // power-ups
   for (const pw of L.powers) if (!pw.taken && Math.hypot(p.x + p.w / 2 - pw.x, p.y + p.h / 2 - pw.y) < 24 + (skin().magnet || 0)) {
@@ -1359,7 +1377,9 @@ function updateWorld(dt) {
   L.msgCool -= dt;
   if (L.exit && overlap(p, L.exit)) {
     const coinsLeft = L.coins.filter((c) => !c.taken).length;
-    if (!L.spare && L.guards.some((g) => g.alive)) {
+    if (L.papers && !L.papers.taken) {
+      if (L.msgCool <= 0) { toast("먼저 문서를 찾아라", true); L.msgCool = 2; }
+    } else if (L.guards.some((g) => g.alive && (!L.spare || g.target))) {
       if (L.msgCool <= 0) { toast("아직 경비가 남아 있다", true); L.msgCool = 2; }
     } else if (coinsLeft) {
       if (L.msgCool <= 0) { toast(`금화가 ${coinsLeft}개 남았다`, true); L.msgCool = 2; }
@@ -1447,8 +1467,10 @@ function startLevel(i, keepStats) {
   // stage rules: spare (no guard may be harmed), hooks (a fixed number of hook throws), limit (seconds to reach the exit)
   const rule = lvAt(i);
   L.spare = !!rule.spare; L.hooksLeft = rule.hooks != null ? rule.hooks : null; L.limit = rule.limit || 0; L.limT = 0;
+  if (!keepStats && L.papers) setTimeout(() => toast("깊은 곳의 문서를 훔쳐라 · 손에 넣는 순간 불길이 번진다"), 900);
   if (!keepStats && (L.spare || L.hooksLeft != null || L.limit)) {
-    const rs = [L.spare && "불살 · 경비를 해치면 실패", L.hooksLeft != null && `갈고리 ${L.hooksLeft}번`, L.limit && `제한 시간 ${L.limit}초`].filter(Boolean);
+    const tgs = L.guards.some((g) => g.target);
+    const rs = [tgs ? "표적만 처치 · 다른 자를 해치면 실패" : L.spare && "불살 · 경비를 해치면 실패", L.hooksLeft != null && `갈고리 ${L.hooksLeft}번`, L.limit && `제한 시간 ${L.limit}초`].filter(Boolean);
     setTimeout(() => toast("이 막의 규칙 · " + rs.join(" · ")), 900);
   }
   if (!keepStats) {
@@ -1506,7 +1528,7 @@ function respawnAtCheckpoint() {
   const p = L.player, c = L.checkpoint;
   Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, fog: 0, wasFog: false, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0, carry: 0 });
   for (const pw of L.powers) pw.taken = false;
-  if (L.chase) L.chase.x = c.x - 200;
+  if (L.chase) L.chase.x = L.chase.dir === -1 ? c.x + PW + 200 : c.x - 200;
   for (const k of p.scarf) { k.x = p.x + p.w / 2; k.y = p.y + 8; }
   Object.assign(L.hook, { state: "idle", crate: null });
   for (const g of L.guards) { g.seeT = 0; g.alert = 0; }
@@ -1652,6 +1674,8 @@ const ACHIEVEMENTS = [
   { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
   { id: "fog50", name: "숨 참는 자", desc: "독안개를 50번 무사히 빠져나온다", goal: 50, val: () => save.stats.fogs || 0 },
   { id: "spare", name: "칼을 거둔 자", desc: "불살 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.spare).length, val: () => LEVELS.reduce((n, l, i) => n + (l.spare && save.best[i] ? 1 : 0), 0) },
+  { id: "mark", name: "그림자 집행자", desc: "표적이 있는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => /[kq]/.test(r))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => /[kq]/.test(r)) ? 1 : 0), 0) },
+  { id: "thief", name: "불길 속의 도둑", desc: "문서를 훔쳐 달아나는 막을 모두 깬다", goal: LEVELS.filter((l) => l.escape).length, val: () => LEVELS.reduce((n, l, i) => n + (l.escape && save.best[i] ? 1 : 0), 0) },
   { id: "clock", name: "시간의 주인", desc: "제한 시간 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.limit).length, val: () => LEVELS.reduce((n, l, i) => n + (l.limit && save.best[i] ? 1 : 0), 0) },
   { id: "epi", name: "이야기의 끝", desc: "에필로그를 본다", goal: 1, val: () => (save.story && save.story.end ? 1 : 0) },
 ];
@@ -1853,7 +1877,10 @@ function updateHUD() {
     chips.push([`열쇠 ${got}/${total}`, !doorsLeft]);
   }
   if (L.plates.length) chips.push([`발판 ${L.plates.filter((q) => q.pressed).length}/${L.plates.length}`, L.plateOpen]);
-  if (L.spare) chips.push(["불살 · 아무도 해치지 마라", false]);
+  const tg = L.guards.filter((g) => g.target);
+  if (tg.length) { const dead = tg.filter((g) => !g.alive).length; chips.push([`표적 ${dead}/${tg.length} · 다른 자는 해치지 마라`, dead === tg.length]); }
+  else if (L.spare) chips.push(["불살 · 아무도 해치지 마라", false]);
+  if (L.papers) chips.push([L.papers.taken ? "문서 확보 · 출구로 달려라" : "문서를 찾아라", L.papers.taken]);
   else if (L.guards.length) { const dead = L.guards.filter((g) => !g.alive).length; chips.push([`경비 처치 ${dead}/${L.guards.length}`, dead === L.guards.length]); }
   if (L.hooksLeft != null) chips.push([`갈고리 ${L.hooksLeft}번 남음`, L.hooksLeft > 0]);
   if (L.limit) { const left = Math.max(0, L.limit - L.limT); chips.push([`남은 시간 ${Math.ceil(left)}초`, left > 5]); }
@@ -2175,6 +2202,23 @@ function drawBell(px, py, t, k) {
   ctx.fillStyle = "#3a2c22"; ctx.beginPath(); ctx.arc(0, 26, 3, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
+function drawPapers(t) {
+  const pp = L.papers;
+  if (!pp || pp.taken) return;
+  const bob = Math.sin(t * 3) * 3;
+  ctx.fillStyle = "rgba(232,216,168,0.25)"; ctx.beginPath(); ctx.arc(pp.x, pp.y + bob, 16, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#e8d8a8"; ctx.fillRect(pp.x - 9, pp.y - 7 + bob, 18, 14);
+  ctx.fillStyle = "#8f2a2a"; ctx.fillRect(pp.x - 9, pp.y - 1 + bob, 18, 3);
+  ctx.fillStyle = "#6b5a3e"; ctx.fillRect(pp.x - 6, pp.y - 4 + bob, 10, 1); ctx.fillRect(pp.x - 6, pp.y + 4 + bob, 12, 1);
+}
+function drawTargets(t) {
+  for (const g of L.guards) {
+    if (!g.target || !g.alive) continue;
+    const cx = g.x + g.w / 2, cy = g.y - 14 + Math.sin(t * 4 + g.x) * 2;
+    ctx.fillStyle = "#e8c15a"; ctx.beginPath(); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx + 5, cy); ctx.lineTo(cx, cy + 6); ctx.lineTo(cx - 5, cy); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#e8c15a"; ctx.fillRect(g.x + 2, g.y + 12, g.w - 4, 3);
+  }
+}
 function drawCrackedWall(px, py, x, y) {
   const y0 = wallColumn(x, y)[0], k = x + "," + y0;
   const hits = (L.wallHits && L.wallHits[k]) || 0, since = L.wallHitT && L.wallHitT[k] !== undefined ? runTime - L.wallHitT[k] : 9;
@@ -2376,10 +2420,20 @@ function drawCoins(t) {
 }
 function drawChase(t) {
   if (!L.chase) return;
-  const x = L.chase.x, top = cam.y - 20, bot = cam.y + viewH + 20;
+  if (L.chase.dir === -1) {
+    // mirror the wall of fire around its front edge
+    ctx.save(); ctx.translate(2 * L.chase.x, 0); ctx.scale(-1, 1);
+    drawFire(t, L.chase.x, 2 * L.chase.x - (cam.x + viewW)); ctx.restore();
+    return;
+  }
+  drawFire(t, L.chase.x, cam.x);
+}
+function drawFire(t, x, left) {
+  const top = cam.y - 20, bot = cam.y + viewH + 20;
   const g = ctx.createLinearGradient(x - 160, 0, x + 24, 0);
   g.addColorStop(0, "rgba(160,30,10,0.92)"); g.addColorStop(0.75, "rgba(230,90,30,0.75)"); g.addColorStop(1, "rgba(255,170,60,0)");
-  ctx.fillStyle = g; ctx.fillRect(Math.max(cam.x - 20, x - 2000), top, x + 24 - Math.max(cam.x - 20, x - 2000), bot - top);
+  const x0 = Math.max(left - 20, x - 2000);
+  ctx.fillStyle = g; ctx.fillRect(x0, top, x + 24 - x0, bot - top);
   ctx.fillStyle = "rgba(255,200,90,0.85)";
   for (let yy = Math.floor(top / 18) * 18; yy < bot; yy += 18) {
     const f = Math.sin(t * 9 + yy * 0.3) * 8 + Math.sin(t * 5.3 + yy) * 5;
@@ -2650,6 +2704,8 @@ function render(t) {
     drawKeys(t);
     drawCrates();
     drawGuards(t);
+    drawTargets(t);
+    drawPapers(t);
     drawRope(t);
     drawGhost(t);
     drawPlayer(t);
