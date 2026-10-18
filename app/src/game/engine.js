@@ -3,7 +3,7 @@
 import { LEVELS, ACTS } from "./levels.js";
 import { BONUS } from "./bonus.js";
 import { getState, setState, update } from "./store.js";
-import { CHAPTERS, EPILOGUE, chapterAt } from "./story.js";
+import { CHAPTERS, EPILOGUE, EPILOGUE2, chapterAt } from "./story.js";
 
 // ---------- constants ----------
 const TS = 32, VW = 960, VH = 540;
@@ -338,6 +338,11 @@ function buildLevel(i) {
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
       else if (c === "{" || c === "}") st.gusty = true;
       else if (c === "p") st.hasPlates = true;
+      else if (c === "0") {
+        st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: -1, kind: "hunter", boss: true, hp: 3, chase: false, lost: 0, search: 0, alive: true, wait: 0, seeT: 0, turnT: WATCH_T * 1.4, anim: 0, deadT: 0, alert: 0 });
+        c = " ";
+      }
+      else if (c === "1" || c === "2") { (st.bossPosts = st.bossPosts || {})[c] = { x, y }; c = " "; }
       else if (c === "m" || c === "a") {
         st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: c === "a" ? 1 : -1, kind: "hunter", chase: false, lost: 0, search: 0, alive: true, wait: 0, seeT: 0, turnT: WATCH_T * 1.4, anim: hash(x, y) * 10, deadT: 0, alert: 0 });
         c = " ";
@@ -1347,6 +1352,11 @@ function drawHunters(t) {
   for (const g of L.guards) {
     if (g.kind !== "hunter" || !g.alive) continue;
     const cx = g.x + g.w / 2;
+    if (g.boss) {
+      ctx.fillStyle = "rgba(40,20,50,0.85)"; ctx.beginPath(); ctx.moveTo(cx - 4, g.y + 6); ctx.lineTo(cx - 16 - g.dir * 4, g.y + g.h); ctx.lineTo(cx + 16 - g.dir * 4, g.y + g.h); ctx.lineTo(cx + 4, g.y + 6); ctx.fill();
+      ctx.fillStyle = "#e8c15a"; ctx.fillRect(cx - 7, g.y - 6, 14, 4); for (const k of [-6, 0, 6]) ctx.fillRect(cx + k - 1, g.y - 10, 3, 4);
+      for (let k = 0; k < 3; k++) { ctx.fillStyle = k < g.hp ? "#d0583f" : "rgba(255,255,255,0.2)"; ctx.fillRect(cx - 13 + k * 9, g.y - 18, 7, 4); }
+    }
     ctx.fillStyle = g.chase ? "#d0583f" : "#7a3a5a"; ctx.fillRect(g.x + 1, g.y + 14, g.w - 2, 4);
     ctx.fillStyle = g.chase ? "#ff6a4a" : "#c98ab0"; ctx.fillRect(cx + g.dir * 4 - 2, g.y + 6, 4, 2);
     if (g.chase) {
@@ -1357,6 +1367,17 @@ function drawHunters(t) {
 }
 function killGuard(g) {
   if (!g.alive) return;
+  // the boss takes three blows; after each he staggers away to his next post (1, then 2)
+  if (g.boss && g.hp > 1) {
+    g.hp--;
+    const post = L.bossPosts && L.bossPosts[String(3 - g.hp)];
+    burst(g.x + g.w / 2, g.y + 10, 22, "#8f2a2a", 240); sfx.kill(); buzz(40);
+    if (post) { g.x = post.x * TS + 6; g.y = post.y * TS + TS - 30; }
+    Object.assign(g, { chase: false, alert: 0, lost: 0, search: 0, dir: -1, turnT: WATCH_T * 1.4 });
+    L.player.invul = Math.max(L.player.invul, 0.6);
+    toast(`백야후가 비틀거리며 물러난다 · 남은 힘 ${g.hp}`, true);
+    return;
+  }
   if (L.spare && !g.target) { die(L.guards.some((q) => q.target) ? "표적이 아닌 자를 해쳤다" : "불살의 맹세를 어겼다"); return; }
   g.alive = false; g.deadT = 0; bump("kills"); if (g.kind === "hunter") bump("huntKills");
   burst(g.x + g.w / 2, g.y + 10, 18, "#8f2a2a", 220);
@@ -1663,6 +1684,7 @@ function respawnAtCheckpoint() {
 function restartLevel() { if (L) startLevel(cur, true); }
 function nextLevel() {
   if (cur === BONUS_I) showMenu();
+  else if (cur === EPILOGUE2_AFTER && !save.story.end2) { const i = cur + 1; showStory("end2", i < LEVELS.length ? () => beginLevel(i) : null); }
   else if (cur === EPILOGUE_AFTER && !save.story.end) { const i = cur + 1; showStory("end", i < LEVELS.length ? () => beginLevel(i) : null); }
   else if (cur + 1 < LEVELS.length) beginLevel(cur + 1);
   else showMenu();
@@ -1675,13 +1697,14 @@ function beginLevel(i) {
 }
 // The epilogue closes the Black Moon story after stage 300; later chapters begin a new one.
 const EPILOGUE_AFTER = Math.min(299, LEVELS.length - 1);
+const EPILOGUE2_AFTER = Math.min(599, LEVELS.length - 1); // after Baekyahu falls
 let storyThen = null, storyKey = null;
 function showStory(key, then) {
-  const ch = key === "end" ? EPILOGUE : CHAPTERS[key];
+  const ch = key === "end" ? EPILOGUE : key === "end2" ? EPILOGUE2 : CHAPTERS[key];
   storyThen = then; storyKey = key;
   setMode("story");
   keepAwake(false);
-  update("story", { label: key === "end" ? "에필로그" : `제${key + 1}장`, title: ch.title, lines: ch.lines, n: (getState().story.n || 0) + 1 });
+  update("story", { label: key === "end" ? "에필로그" : key === "end2" ? "두 번째 에필로그" : `제${key + 1}장`, title: ch.title, lines: ch.lines, n: (getState().story.n || 0) + 1 });
   setState({ overlay: "story", hudShown: false });
 }
 export function storyContinue() {
@@ -1798,6 +1821,7 @@ const ACHIEVEMENTS = [
   { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
   { id: "fog50", name: "숨 참는 자", desc: "독안개를 50번 무사히 빠져나온다", goal: 50, val: () => save.stats.fogs || 0 },
   { id: "spare", name: "칼을 거둔 자", desc: "불살 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.spare).length, val: () => LEVELS.reduce((n, l, i) => n + (l.spare && save.best[i] ? 1 : 0), 0) },
+  { id: "boss", name: "백야의 끝", desc: "백야후를 쓰러뜨린다", goal: 1, val: () => (LEVELS.some((l, i) => save.best[i] && l.map.some((r) => r.includes("0"))) ? 1 : 0) },
   { id: "dive", name: "물의 그림자", desc: "물속에 30번 잠수한다", goal: 30, val: () => save.stats.dives || 0 },
   { id: "hunt", name: "사냥꾼의 사냥꾼", desc: "추적자를 10명 처치한다", goal: 10, val: () => save.stats.huntKills || 0 },
   { id: "rescue", name: "구원자", desc: "갇힌 사람을 구하는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => r.includes("h"))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => r.includes("h")) ? 1 : 0), 0) },
@@ -1902,6 +1926,7 @@ export function menuInfo() {
       const list = CHAPTERS.map((c, k) => ({ key: k, label: `제${k + 1}장 · ${c.title}`, open: save.unlocked > c.from }));
       const at = CHAPTERS.findIndex((c) => c.from > EPILOGUE_AFTER);
       list.splice(at < 0 ? list.length : at, 0, { key: "end", label: "에필로그 · " + EPILOGUE.title, open: !!save.story.end || !!save.best[EPILOGUE_AFTER] });
+      if (LEVELS.length > EPILOGUE2_AFTER) list.push({ key: "end2", label: "두 번째 에필로그 · " + EPILOGUE2.title, open: !!save.story.end2 || !!save.best[EPILOGUE2_AFTER] });
       return list;
     })(),
     segments: SEGMENTS.map(([a, b], idx) => {
