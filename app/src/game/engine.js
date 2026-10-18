@@ -458,6 +458,31 @@ const CLIMB_V = 150;
 // Poison fog (f): open air. Inside it no guard or searchlight sees you, but you hold your breath:
 // FOG_T seconds in the fog kills you, and breath comes back FOG_BACK times as fast once you are out.
 const FOG_T = 1.8, FOG_BACK = 1.5;
+// Water (e): with your head under you are hidden from guards and searchlights, but AIR_T seconds under drowns you.
+const SWIM_V = 150, SWIM_SINK = 45, AIR_T = 8;
+const underWater = (p) => tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + 5) / TS)) === "e";
+function drawWater(t) {
+  const x0 = Math.max(0, Math.floor(cam.x / TS) - 1), x1 = Math.min(L.W - 1, Math.ceil((cam.x + viewW) / TS) + 1);
+  const y0 = Math.max(0, Math.floor(cam.y / TS) - 1), y1 = Math.min(L.H - 1, Math.ceil((cam.y + viewH) / TS) + 1);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (L.grid[y][x] !== "e") continue;
+    const px = x * TS, py = y * TS, top = y === 0 || L.grid[y - 1][x] !== "e";
+    ctx.fillStyle = top ? "rgba(60,120,180,0.42)" : "rgba(30,70,130,0.55)"; ctx.fillRect(px, py, TS, TS);
+    if (top) {
+      ctx.fillStyle = "rgba(170,215,240,0.75)";
+      for (let k = 0; k < 4; k++) { const wx = px + k * 8, wy = py + 2 + Math.sin(t * 3 + x * 1.3 + k) * 1.5; ctx.fillRect(wx, wy, 6, 2); }
+    } else if (hash(x, y) > 0.8) {
+      const by = py + TS - ((t * 20 + hash(y, x) * 32) % TS);
+      ctx.fillStyle = "rgba(170,215,240,0.4)"; ctx.beginPath(); ctx.arc(px + 8 + hash(x + 3, y) * 16, by, 2, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  const p = L.player;
+  if (p.air > 0.05 && mode === "play") {
+    const left = Math.max(0, 1 - p.air / AIR_T), bx = p.x + p.w / 2 - 14, by = p.y - 18;
+    ctx.fillStyle = "rgba(10,12,20,0.7)"; ctx.fillRect(bx - 1, by - 1, 30, 5);
+    ctx.fillStyle = left < 0.3 ? "#d0583f" : "#8fc4e8"; ctx.fillRect(bx, by, 28 * left, 3);
+  }
+}
 const inFog = (p) => tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h / 2) / TS)) === "f";
 function drawFog(t) {
   const x0 = Math.max(0, Math.floor(cam.x / TS) - 1), x1 = Math.min(L.W - 1, Math.ceil((cam.x + viewW) / TS) + 1);
@@ -1115,6 +1140,16 @@ function updatePlayer(dt) {
     if (!ix) { const cx = Math.floor((p.x + p.w / 2) / TS) * TS + (TS - p.w) / 2; moveAxis(p, "x", clamp(cx - p.x, -240 * dt, 240 * dt)); }
   }
 
+  // water (e): swim. Up/down to swim, you sink slowly otherwise; at the surface, up (or jump) hops you out.
+  p.swim = !hooked && !p.latched && tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + p.h / 2) / TS)) === "e";
+  if (p.swim) {
+    const surface = tileAt(Math.floor((p.x + p.w / 2) / TS), Math.floor((p.y + 2) / TS)) !== "e";
+    if (surface && (up || p.jbuf > 0)) { p.vy = -JUMP * 0.78; p.jbuf = 0; sfx.jump(); burst(p.x + p.w / 2, p.y + 6, 8, "#8fc4e8", 90); }
+    else p.vy = approach(p.vy - GRAV * dt, up ? -SWIM_V : down ? SWIM_V : SWIM_SINK, 900 * dt); // water cancels this frame's gravity
+    p.vx = clamp(approach(p.vx, ix * RUN * 0.6, ACC_G * dt), -RUN * 0.6, RUN * 0.6);
+    p.coyote = 0;
+  }
+
   // conveyor (> or <): standing on it carries you along on top of your own running
   // and leaving it (by jumping or running off the end) keeps the belt's speed as momentum
   if (p.ground && !hooked) {
@@ -1200,7 +1235,7 @@ function updateCrates(dt) {
 const CAPTIVE_DELAY = 0.6;
 function canSeeCaptive(g) {
   const c = L.captive;
-  if (!c || !c.freed || inBush(c) || inFog(c)) return false;
+  if (!c || !c.freed || inBush(c) || inFog(c) || underWater(c)) return false;
   const ex = g.x + g.w / 2 + g.dir * 4, ey = g.y + 8;
   for (const [px, py] of [[c.x + c.w / 2, c.y + c.h / 2], [c.x + c.w / 2, c.y + 4]]) {
     const dx = px - ex, dy = py - ey;
@@ -1241,7 +1276,7 @@ function drawCaptive(t) {
 }
 function canSee(g) {
   const p = L.player;
-  if (p.cloak > 0 || p.invul > 0 || inBush(p) || inFog(p)) return false;
+  if (p.cloak > 0 || p.invul > 0 || inBush(p) || inFog(p) || underWater(p)) return false;
   const ex = g.x + g.w / 2 + g.dir * 4, ey = g.y + 8;
   const pts = [[p.x + p.w / 2, p.y + p.h / 2], [p.x + p.w / 2, p.y + 4]];
   for (const [px, py] of pts) {
@@ -1378,6 +1413,8 @@ function updateWorld(dt) {
   const x0 = Math.floor(p.x / TS), x1 = Math.floor((p.x + p.w) / TS), y0 = Math.floor(p.y / TS), y1 = Math.floor((p.y + p.h) / TS);
   for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++)
     if (tileAt(tx, ty) === "^" && overlap(p, { x: tx * TS + 4, y: ty * TS + 16, w: TS - 8, h: TS - 16 })) { die("가시에 찔렸다"); return; }
+  if (underWater(p)) { p.air = (p.air || 0) + dt; if (p.air >= AIR_T) { die("물에 빠졌다"); return; } }
+  else if (p.air > 0) { if (p.air > 1) bump("dives"); p.air = 0; }
   if (inFog(p)) {
     p.fog = (p.fog || 0) + dt; p.wasFog = true;
     if (p.fog >= FOG_T) { die("독안개를 들이마셨다"); return; }
@@ -1386,7 +1423,7 @@ function updateWorld(dt) {
     if (p.fog > 0) p.fog = Math.max(0, p.fog - dt * FOG_BACK);
   }
   if (L.lamps.length) {
-    const lit = p.cloak <= 0 && p.invul <= 0 && !inBush(p) && !inFog(p) && L.lamps.some((l) => inLamp(l, p.x + p.w / 2, p.y + p.h / 2, runTime) || inLamp(l, p.x + p.w / 2, p.y + 4, runTime));
+    const lit = p.cloak <= 0 && p.invul <= 0 && !inBush(p) && !inFog(p) && !underWater(p) && L.lamps.some((l) => inLamp(l, p.x + p.w / 2, p.y + p.h / 2, runTime) || inLamp(l, p.x + p.w / 2, p.y + 4, runTime));
     L.lampSee = lit ? L.lampSee + dt : Math.max(0, L.lampSee - dt * 0.7);
     if (L.lampSee >= (hard ? 0.18 : 0.25)) { sfx.alert(); die("탐조등에 들켰다"); return; }
   }
@@ -1612,7 +1649,7 @@ const POWER = {
 };
 function respawnAtCheckpoint() {
   const p = L.player, c = L.checkpoint;
-  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, fog: 0, wasFog: false, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0, carry: 0 });
+  Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, fog: 0, wasFog: false, air: 0, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0, carry: 0 });
   for (const pw of L.powers) pw.taken = false;
   if (L.captive && L.captive.freed) { L.captive.trail = []; L.captive.x = c.x; L.captive.y = c.y + PH - L.captive.h; }
   if (L.chase) L.chase.x = L.chase.dir === -1 ? c.x + PW + 200 : c.x - 200;
@@ -1761,6 +1798,7 @@ const ACHIEVEMENTS = [
   { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
   { id: "fog50", name: "숨 참는 자", desc: "독안개를 50번 무사히 빠져나온다", goal: 50, val: () => save.stats.fogs || 0 },
   { id: "spare", name: "칼을 거둔 자", desc: "불살 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.spare).length, val: () => LEVELS.reduce((n, l, i) => n + (l.spare && save.best[i] ? 1 : 0), 0) },
+  { id: "dive", name: "물의 그림자", desc: "물속에 30번 잠수한다", goal: 30, val: () => save.stats.dives || 0 },
   { id: "hunt", name: "사냥꾼의 사냥꾼", desc: "추적자를 10명 처치한다", goal: 10, val: () => save.stats.huntKills || 0 },
   { id: "rescue", name: "구원자", desc: "갇힌 사람을 구하는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => r.includes("h"))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => r.includes("h")) ? 1 : 0), 0) },
   { id: "mark", name: "그림자 집행자", desc: "표적이 있는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => /[kq]/.test(r))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => /[kq]/.test(r)) ? 1 : 0), 0) },
@@ -2803,6 +2841,7 @@ function render(t) {
     drawPlayer(t);
     drawBushes(t);
     drawFog(t);
+    drawWater(t);
     drawTrolleys(t);
     drawParticles();
     drawChase(t);
