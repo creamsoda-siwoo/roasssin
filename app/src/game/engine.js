@@ -342,6 +342,7 @@ function buildLevel(i) {
         st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: c === "q" ? 1 : -1, kind: "static", target: true, alive: true, wait: 0, seeT: 0, turnT: WATCH_T, anim: hash(x, y) * 10, deadT: 0, alert: 0 });
         c = " ";
       }
+      else if (c === "h") { st.captive = { x: x * TS + 7, y: y * TS + TS - 26, w: 18, h: 26, hx: x * TS + 7, hy: y * TS + TS - 26, freed: false, trail: [], t: 0, face: 1 }; c = " "; }
       else if (c === "j") { st.papers = { x: x * TS + 16, y: y * TS + 18, taken: false }; c = " "; }
       else if (c === "u" || c === "y") { (st.trolleys = st.trolleys || []).push({ hx: x, ty: y, dir: c === "u" ? 1 : -1 }); c = "-"; }
       else if (c === "v") { st.icicles.push({ tx: x, ty: y, st: 0, t: 0, y: 0, vy: 0, floor: -1 }); c = " "; }
@@ -1191,6 +1192,49 @@ function updateCrates(dt) {
   }
 }
 
+// A rescued captive (h) walks your path CAPTIVE_DELAY seconds behind you. Guards can spot them too.
+const CAPTIVE_DELAY = 0.6;
+function canSeeCaptive(g) {
+  const c = L.captive;
+  if (!c || !c.freed || inBush(c) || inFog(c)) return false;
+  const ex = g.x + g.w / 2 + g.dir * 4, ey = g.y + 8;
+  for (const [px, py] of [[c.x + c.w / 2, c.y + c.h / 2], [c.x + c.w / 2, c.y + 4]]) {
+    const dx = px - ex, dy = py - ey;
+    if (dx * g.dir <= 0 || Math.hypot(dx, dy) > VIS || Math.atan2(Math.abs(dy), Math.abs(dx)) > VIS_HALF) continue;
+    if (segClear(ex, ey, px, py, 0, 0, true)) return true;
+  }
+  return false;
+}
+function updateCaptive(dt) {
+  const c = L.captive, p = L.player;
+  if (!c) return;
+  if (!c.freed) {
+    if (mode === "play" && overlap(p, c)) {
+      c.freed = true; c.t = 0; c.trail = []; sfx.key(); buzz(25); burst(c.x + c.w / 2, c.y + 8, 16, "#e8c15a", 140);
+      toast("구출했다 · 네 발자국을 따라온다. 경비 눈에 띄지 않게 데려가라", true);
+    }
+    return;
+  }
+  c.t += dt;
+  c.trail.push([c.t, p.x + (p.w - c.w) / 2, p.y + p.h - c.h]);
+  while (c.trail.length > 1 && c.trail[1][0] <= c.t - CAPTIVE_DELAY) c.trail.shift();
+  const [, nx, ny] = c.trail[0];
+  if (Math.abs(nx - c.x) > 0.5) c.face = Math.sign(nx - c.x);
+  c.x = nx; c.y = ny;
+}
+function drawCaptive(t) {
+  const c = L.captive;
+  if (!c) return;
+  const cx = c.x + c.w / 2, by = c.y + c.h;
+  ctx.fillStyle = "#c9a45a"; ctx.fillRect(c.x + 3, c.y + 9, c.w - 6, c.h - 9);
+  ctx.fillStyle = "#e8d2b0"; ctx.beginPath(); ctx.arc(cx, c.y + 6, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#3a2c22"; ctx.fillRect(cx - 5, c.y, 10, 3);
+  if (c.freed) { const sw = Math.sin(t * 10) * 2; ctx.fillStyle = "#8a6a3e"; ctx.fillRect(cx - 4 + sw, by - 4, 3, 4); ctx.fillRect(cx + 1 - sw, by - 4, 3, 4); return; }
+  ctx.strokeStyle = "#8a96b4"; ctx.lineWidth = 2;
+  for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(c.hx - 6 + k * 7.5, c.hy - 8); ctx.lineTo(c.hx - 6 + k * 7.5, c.hy + c.h); ctx.stroke(); }
+  ctx.fillStyle = "#8a96b4"; ctx.fillRect(c.hx - 8, c.hy - 10, 34, 3);
+  ctx.fillStyle = "rgba(232,193,90," + (0.5 + 0.5 * Math.sin(t * 4)) + ")"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", cx, c.hy - 14);
+}
 function canSee(g) {
   const p = L.player;
   if (p.cloak > 0 || p.invul > 0 || inBush(p) || inFog(p)) return false;
@@ -1225,7 +1269,7 @@ function updateGuards(dt) {
       g.turnT -= dt;
       if (g.turnT <= 0) { g.dir *= -1; g.turnT = WATCH_T; }
     }
-    if (mode === "play" && canSee(g)) { g.seeT += dt; if (g.seeT >= SEE_LIMIT) detected(g); }
+    if (mode === "play" && (canSee(g) || canSeeCaptive(g))) { g.seeT += dt; if (g.seeT >= SEE_LIMIT) detected(g); }
     else g.seeT = Math.max(0, g.seeT - dt * 0.7);
 
     if (mode === "play" && overlap(p, g)) {
@@ -1377,7 +1421,9 @@ function updateWorld(dt) {
   L.msgCool -= dt;
   if (L.exit && overlap(p, L.exit)) {
     const coinsLeft = L.coins.filter((c) => !c.taken).length;
-    if (L.papers && !L.papers.taken) {
+    if (L.captive && !L.captive.freed) {
+      if (L.msgCool <= 0) { toast("갇힌 사람을 먼저 구해라", true); L.msgCool = 2; }
+    } else if (L.papers && !L.papers.taken) {
       if (L.msgCool <= 0) { toast("먼저 문서를 찾아라", true); L.msgCool = 2; }
     } else if (L.guards.some((g) => g.alive && (!L.spare || g.target))) {
       if (L.msgCool <= 0) { toast("아직 경비가 남아 있다", true); L.msgCool = 2; }
@@ -1467,6 +1513,7 @@ function startLevel(i, keepStats) {
   // stage rules: spare (no guard may be harmed), hooks (a fixed number of hook throws), limit (seconds to reach the exit)
   const rule = lvAt(i);
   L.spare = !!rule.spare; L.hooksLeft = rule.hooks != null ? rule.hooks : null; L.limit = rule.limit || 0; L.limT = 0;
+  if (!keepStats && L.captive) setTimeout(() => toast("갇힌 사람을 구해 함께 출구로 가라"), 900);
   if (!keepStats && L.papers) setTimeout(() => toast("깊은 곳의 문서를 훔쳐라 · 손에 넣는 순간 불길이 번진다"), 900);
   if (!keepStats && (L.spare || L.hooksLeft != null || L.limit)) {
     const tgs = L.guards.some((g) => g.target);
@@ -1528,6 +1575,7 @@ function respawnAtCheckpoint() {
   const p = L.player, c = L.checkpoint;
   Object.assign(p, { x: c.x, y: c.y, vx: 0, vy: 0, fog: 0, wasFog: false, coyote: 0, jbuf: 0, boost: false, portalLock: true, cloak: 0, boots: 0, shield: !!skin().shield, invul: 0, carry: 0 });
   for (const pw of L.powers) pw.taken = false;
+  if (L.captive && L.captive.freed) { L.captive.trail = []; L.captive.x = c.x; L.captive.y = c.y + PH - L.captive.h; }
   if (L.chase) L.chase.x = L.chase.dir === -1 ? c.x + PW + 200 : c.x - 200;
   for (const k of p.scarf) { k.x = p.x + p.w / 2; k.y = p.y + 8; }
   Object.assign(L.hook, { state: "idle", crate: null });
@@ -1674,6 +1722,7 @@ const ACHIEVEMENTS = [
   { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
   { id: "fog50", name: "숨 참는 자", desc: "독안개를 50번 무사히 빠져나온다", goal: 50, val: () => save.stats.fogs || 0 },
   { id: "spare", name: "칼을 거둔 자", desc: "불살 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.spare).length, val: () => LEVELS.reduce((n, l, i) => n + (l.spare && save.best[i] ? 1 : 0), 0) },
+  { id: "rescue", name: "구원자", desc: "갇힌 사람을 구하는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => r.includes("h"))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => r.includes("h")) ? 1 : 0), 0) },
   { id: "mark", name: "그림자 집행자", desc: "표적이 있는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => /[kq]/.test(r))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => /[kq]/.test(r)) ? 1 : 0), 0) },
   { id: "thief", name: "불길 속의 도둑", desc: "문서를 훔쳐 달아나는 막을 모두 깬다", goal: LEVELS.filter((l) => l.escape).length, val: () => LEVELS.reduce((n, l, i) => n + (l.escape && save.best[i] ? 1 : 0), 0) },
   { id: "clock", name: "시간의 주인", desc: "제한 시간 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.limit).length, val: () => LEVELS.reduce((n, l, i) => n + (l.limit && save.best[i] ? 1 : 0), 0) },
@@ -1880,6 +1929,7 @@ function updateHUD() {
   const tg = L.guards.filter((g) => g.target);
   if (tg.length) { const dead = tg.filter((g) => !g.alive).length; chips.push([`표적 ${dead}/${tg.length} · 다른 자는 해치지 마라`, dead === tg.length]); }
   else if (L.spare) chips.push(["불살 · 아무도 해치지 마라", false]);
+  if (L.captive) chips.push([L.captive.freed ? "동행 중 · 들키지 않게" : "갇힌 사람을 구해라", L.captive.freed]);
   if (L.papers) chips.push([L.papers.taken ? "문서 확보 · 출구로 달려라" : "문서를 찾아라", L.papers.taken]);
   else if (L.guards.length) { const dead = L.guards.filter((g) => !g.alive).length; chips.push([`경비 처치 ${dead}/${L.guards.length}`, dead === L.guards.length]); }
   if (L.hooksLeft != null) chips.push([`갈고리 ${L.hooksLeft}번 남음`, L.hooksLeft > 0]);
@@ -2705,6 +2755,7 @@ function render(t) {
     drawCrates();
     drawGuards(t);
     drawTargets(t);
+    drawCaptive(t);
     drawPapers(t);
     drawRope(t);
     drawGhost(t);
@@ -2736,6 +2787,7 @@ function step(dt) {
     updateTimedDoors(dt);
     if (L.limit && mode === "play") { L.limT += dt; if (L.limT >= L.limit) die("시간이 다 됐다"); }
     updateTrolleys(dt);
+    updateCaptive(dt);
     updateIcicles(dt);
     updateSprings(dt);
     updateWorld(dt);
