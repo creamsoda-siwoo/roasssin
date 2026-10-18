@@ -338,6 +338,10 @@ function buildLevel(i) {
       else if (c === "M") st.crushers.push({ tx: x, ty: y, reach: 0 });
       else if (c === "{" || c === "}") st.gusty = true;
       else if (c === "p") st.hasPlates = true;
+      else if (c === "m" || c === "a") {
+        st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: c === "a" ? 1 : -1, kind: "hunter", chase: false, lost: 0, search: 0, alive: true, wait: 0, seeT: 0, turnT: WATCH_T * 1.4, anim: hash(x, y) * 10, deadT: 0, alert: 0 });
+        c = " ";
+      }
       else if (c === "k" || c === "q") {
         st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: c === "q" ? 1 : -1, kind: "static", target: true, alive: true, wait: 0, seeT: 0, turnT: WATCH_T, anim: hash(x, y) * 10, deadT: 0, alert: 0 });
         c = " ";
@@ -1268,8 +1272,8 @@ function updateGuards(dt) {
     } else if (g.kind === "watch") {
       g.turnT -= dt;
       if (g.turnT <= 0) { g.dir *= -1; g.turnT = WATCH_T; }
-    }
-    if (mode === "play" && (canSee(g) || canSeeCaptive(g))) { g.seeT += dt; if (g.seeT >= SEE_LIMIT) detected(g); }
+    } else if (g.kind === "hunter") updateHunter(g, dt);
+    if (g.kind !== "hunter" && mode === "play" && (canSee(g) || canSeeCaptive(g))) { g.seeT += dt; if (g.seeT >= SEE_LIMIT) detected(g); }
     else g.seeT = Math.max(0, g.seeT - dt * 0.7);
 
     if (mode === "play" && overlap(p, g)) {
@@ -1281,10 +1285,45 @@ function updateGuards(dt) {
   }
 }
 
+// Hunters (m faces left, a faces right): they look about like a watcher, but seeing you is not the end: they
+// shout and run at you (faster on harder modes, slower than you). Walls, ledge edges, pits, spikes and shut doors
+// stop them, and they cannot climb. Out of sight (hidden, or simply gone) they halt, search HUNT_LOSE s and settle.
+const HUNT_LOSE = 2.0;
+function updateHunter(g, dt) {
+  const p = L.player, sees = mode === "play" && (canSee(g) || canSeeCaptive(g));
+  if (sees) {
+    if (!g.chase) { g.chase = true; g.alert = 1; sfx.alert(); toast("추적자가 쫓아온다!", true); bump("hunted"); }
+    g.lost = 0; g.search = 0;
+  } else if (g.chase) {
+    g.lost += dt;
+    if (g.lost > 0.25) { g.search += dt; if (g.search > HUNT_LOSE) { g.chase = false; g.alert = 0; g.turnT = WATCH_T * 1.4; } }
+  }
+  if (!g.chase) { g.turnT -= dt; if (g.turnT <= 0) { g.dir *= -1; g.turnT = WATCH_T * 1.4; } return; }
+  if (g.lost > 0.25) return; // searching: stand still and look
+  const want = Math.sign(p.x + p.w / 2 - (g.x + g.w / 2));
+  if (want) g.dir = want;
+  const v = [160, 190, 215][diff], nx = g.x + g.dir * v * dt;
+  const fx = g.dir > 0 ? nx + g.w + 1 : nx - 1;
+  const tx = Math.floor(fx / TS), tyMid = Math.floor((g.y + g.h / 2) / TS), tyFeet = Math.floor((g.y + g.h - 2) / TS), tyBelow = Math.floor((g.y + g.h + 2) / TS);
+  const block = isSolid(tx, tyMid) || !isSolid(tx, tyBelow) || tileAt(tx, tyFeet) === "^" || L.crates.some((c) => inRect(fx, g.y + g.h / 2, c));
+  if (!block && Math.abs(p.x + p.w / 2 - (g.x + g.w / 2)) > 4) g.x = nx;
+}
+function drawHunters(t) {
+  for (const g of L.guards) {
+    if (g.kind !== "hunter" || !g.alive) continue;
+    const cx = g.x + g.w / 2;
+    ctx.fillStyle = g.chase ? "#d0583f" : "#7a3a5a"; ctx.fillRect(g.x + 1, g.y + 14, g.w - 2, 4);
+    ctx.fillStyle = g.chase ? "#ff6a4a" : "#c98ab0"; ctx.fillRect(cx + g.dir * 4 - 2, g.y + 6, 4, 2);
+    if (g.chase) {
+      ctx.fillStyle = g.lost > 0.25 ? "#e8c15a" : "#ff6a4a"; ctx.font = "bold 15px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(g.lost > 0.25 ? "?" : "!!", cx, g.y - 8 + Math.sin(t * 12) * 1.5);
+    }
+  }
+}
 function killGuard(g) {
   if (!g.alive) return;
   if (L.spare && !g.target) { die(L.guards.some((q) => q.target) ? "표적이 아닌 자를 해쳤다" : "불살의 맹세를 어겼다"); return; }
-  g.alive = false; g.deadT = 0; bump("kills");
+  g.alive = false; g.deadT = 0; bump("kills"); if (g.kind === "hunter") bump("huntKills");
   burst(g.x + g.w / 2, g.y + 10, 18, "#8f2a2a", 220);
   burst(g.x + g.w / 2, g.y + 10, 8, "#e9e3d3", 160);
   sfx.kill();
@@ -1722,6 +1761,7 @@ const ACHIEVEMENTS = [
   { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
   { id: "fog50", name: "숨 참는 자", desc: "독안개를 50번 무사히 빠져나온다", goal: 50, val: () => save.stats.fogs || 0 },
   { id: "spare", name: "칼을 거둔 자", desc: "불살 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.spare).length, val: () => LEVELS.reduce((n, l, i) => n + (l.spare && save.best[i] ? 1 : 0), 0) },
+  { id: "hunt", name: "사냥꾼의 사냥꾼", desc: "추적자를 10명 처치한다", goal: 10, val: () => save.stats.huntKills || 0 },
   { id: "rescue", name: "구원자", desc: "갇힌 사람을 구하는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => r.includes("h"))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => r.includes("h")) ? 1 : 0), 0) },
   { id: "mark", name: "그림자 집행자", desc: "표적이 있는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => /[kq]/.test(r))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => /[kq]/.test(r)) ? 1 : 0), 0) },
   { id: "thief", name: "불길 속의 도둑", desc: "문서를 훔쳐 달아나는 막을 모두 깬다", goal: LEVELS.filter((l) => l.escape).length, val: () => LEVELS.reduce((n, l, i) => n + (l.escape && save.best[i] ? 1 : 0), 0) },
@@ -2755,6 +2795,7 @@ function render(t) {
     drawCrates();
     drawGuards(t);
     drawTargets(t);
+    drawHunters(t);
     drawCaptive(t);
     drawPapers(t);
     drawRope(t);
