@@ -67,6 +67,10 @@ kbd { font-family: var(--body); font-size: 12px; border: 1px solid var(--line); 
 .srb small { font-size: 11px; color: var(--paper-dim); font-variant-numeric: tabular-nums; }
 .srb.all { grid-column: 1 / -1; border-color: var(--rope); }
 .srb.all b { color: var(--rope); }
+.fold.boss > summary { color: #e8c15a; }
+.bossbtn { color: #e8c15a; border-color: rgba(232,193,90,0.6); }
+.srb.done { border-color: #e8c15a; }
+.srb.done b::after { content: " ✓"; color: #e8c15a; }
 .stat.run b { color: var(--rope); }
 #bHard.master, body.master .act.hardtag, body.master .lv .n, body.master .fold summary { border-color: #b48cf0; color: #b48cf0; }
 .act.mastertag { color: #b48cf0 !important; }

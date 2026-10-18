@@ -2,6 +2,7 @@
 // It owns the game loop; everything the UI shows is pushed to ./store.js and drawn by the React components.
 import { LEVELS, ACTS } from "./levels.js";
 import { BONUS } from "./bonus.js";
+import { BOSSES } from "./bosses.js";
 import { getState, setState, update } from "./store.js";
 import { CHAPTERS, EPILOGUE, EPILOGUE2, chapterAt } from "./story.js";
 
@@ -38,9 +39,9 @@ const REBUILT = [43, 58, 66, 70, 92, 98, 107, 112, 113, 119, 121, 125, 126, 127,
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {}, bonusGhost: !!s.bonusGhost };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {}, bonusGhost: !!s.bonusGhost, boss: s.boss || {} };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {}, bonus: {}, bonusGhost: true };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {}, bonus: {}, boss: {}, bonusGhost: true };
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
@@ -108,7 +109,7 @@ if (save.mapRev < MAP_REV) {
   try { localStorage.setItem(GHOST_KEY, JSON.stringify(ghosts)); } catch (e) {}
   writeSave();
 }
-const ghostId = (i) => diff + ":" + (i === BONUS_I ? "bonus" : i);
+const ghostId = (i) => diff + ":" + (i === BONUS_I ? "bonus" : i > BONUS_I ? "boss" + (i - BONUS_I - 1) : i);
 // The bonus ghost was first stored under index 300 (one past the campaign, which then ended at 300); give it its fixed key.
 if (!save.bonusGhost) {
   for (const d of [0, 1, 2]) if (ghosts[d + ":300"] && save.bonus && save.bonus[d]) { ghosts[d + ":bonus"] = ghosts[d + ":300"]; delete ghosts[d + ":300"]; }
@@ -309,8 +310,10 @@ function hash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >
 let L = null, cur = 0, mode = "menu";
 // The bonus stage sits just past the campaign's last index so ghosts and the level flow can treat it like any stage.
 const BONUS_I = LEVELS.length;
-const lvAt = (i) => (i === BONUS_I ? BONUS : LEVELS[i]);
-const actAt = (i) => (i === BONUS_I ? "보너스" : ACTS[i]);
+// Boss fights sit after the bonus: open from the menu from the start, with their own records.
+const BOSS_I = (k) => BONUS_I + 1 + k;
+const lvAt = (i) => (i === BONUS_I ? BONUS : i > BONUS_I ? BOSSES[i - BONUS_I - 1] : LEVELS[i]);
+const actAt = (i) => (i === BONUS_I ? "보너스" : i > BONUS_I ? "보스전" : ACTS[i]);
 let runTime = 0, runDeaths = 0, deadT = 0;
 const cam = { x: 0, y: 0 };
 
@@ -339,10 +342,10 @@ function buildLevel(i) {
       else if (c === "{" || c === "}") st.gusty = true;
       else if (c === "p") st.hasPlates = true;
       else if (c === "0") {
-        st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: -1, kind: "hunter", boss: true, hp: 3, chase: false, lost: 0, search: 0, alive: true, wait: 0, seeT: 0, turnT: WATCH_T * 1.4, anim: 0, deadT: 0, alert: 0 });
+        st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: -1, kind: "hunter", boss: true, hp: def.bossHp || 3, maxHp: def.bossHp || 3, chase: false, lost: 0, search: 0, alive: true, wait: 0, seeT: 0, turnT: WATCH_T * 1.4, anim: 0, deadT: 0, alert: 0 });
         c = " ";
       }
-      else if (c === "1" || c === "2") { (st.bossPosts = st.bossPosts || {})[c] = { x, y }; c = " "; }
+      else if (c >= "1" && c <= "9") { (st.bossPosts = st.bossPosts || {})[c] = { x, y }; c = " "; }
       else if (c === "m" || c === "a") {
         st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: c === "a" ? 1 : -1, kind: "hunter", chase: false, lost: 0, search: 0, alive: true, wait: 0, seeT: 0, turnT: WATCH_T * 1.4, anim: hash(x, y) * 10, deadT: 0, alert: 0 });
         c = " ";
@@ -1355,7 +1358,8 @@ function drawHunters(t) {
     if (g.boss) {
       ctx.fillStyle = "rgba(40,20,50,0.85)"; ctx.beginPath(); ctx.moveTo(cx - 4, g.y + 6); ctx.lineTo(cx - 16 - g.dir * 4, g.y + g.h); ctx.lineTo(cx + 16 - g.dir * 4, g.y + g.h); ctx.lineTo(cx + 4, g.y + 6); ctx.fill();
       ctx.fillStyle = "#e8c15a"; ctx.fillRect(cx - 7, g.y - 6, 14, 4); for (const k of [-6, 0, 6]) ctx.fillRect(cx + k - 1, g.y - 10, 3, 4);
-      for (let k = 0; k < 3; k++) { ctx.fillStyle = k < g.hp ? "#d0583f" : "rgba(255,255,255,0.2)"; ctx.fillRect(cx - 13 + k * 9, g.y - 18, 7, 4); }
+      const mh = g.maxHp || 3;
+      for (let k = 0; k < mh; k++) { ctx.fillStyle = k < g.hp ? "#d0583f" : "rgba(255,255,255,0.2)"; ctx.fillRect(cx - mh * 4.5 + 1 + k * 9, g.y - 18, 7, 4); }
     }
     ctx.fillStyle = g.chase ? "#d0583f" : "#7a3a5a"; ctx.fillRect(g.x + 1, g.y + 14, g.w - 2, 4);
     ctx.fillStyle = g.chase ? "#ff6a4a" : "#c98ab0"; ctx.fillRect(cx + g.dir * 4 - 2, g.y + 6, 4, 2);
@@ -1370,7 +1374,7 @@ function killGuard(g) {
   // the boss takes three blows; after each he staggers away to his next post (1, then 2)
   if (g.boss && g.hp > 1) {
     g.hp--;
-    const post = L.bossPosts && L.bossPosts[String(3 - g.hp)];
+    const post = L.bossPosts && L.bossPosts[String((g.maxHp || 3) - g.hp)];
     burst(g.x + g.w / 2, g.y + 10, 22, "#8f2a2a", 240); sfx.kill(); buzz(40);
     if (post) { g.x = post.x * TS + 6; g.y = post.y * TS + TS - 30; }
     Object.assign(g, { chase: false, alert: 0, lost: 0, search: 0, dir: -1, turnT: WATCH_T * 1.4 });
@@ -1628,7 +1632,7 @@ function startLevel(i, keepStats) {
   keepAwake(true);
   fadeGoal();
   update("hud", {
-    act: (i === BONUS_I ? "보너스 · 초고난도" : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : ""),
+    act: (i === BONUS_I ? "보너스 · 초고난도" : i > BONUS_I ? `보스전 ${i - BONUS_I} / ${BOSSES.length}` : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : ""),
     hard, master, name: lvAt(i).name, goal: lvAt(i).goal,
   });
   syncHintText();
@@ -1683,7 +1687,7 @@ function respawnAtCheckpoint() {
 }
 function restartLevel() { if (L) startLevel(cur, true); }
 function nextLevel() {
-  if (cur === BONUS_I) showMenu();
+  if (cur >= BONUS_I) showMenu();
   else if (cur === EPILOGUE2_AFTER && !save.story.end2) { const i = cur + 1; showStory("end2", i < LEVELS.length ? () => beginLevel(i) : null); }
   else if (cur === EPILOGUE_AFTER && !save.story.end) { const i = cur + 1; showStory("end", i < LEVELS.length ? () => beginLevel(i) : null); }
   else if (cur + 1 < LEVELS.length) beginLevel(cur + 1);
@@ -1821,6 +1825,7 @@ const ACHIEVEMENTS = [
   { id: "trol30", name: "허공의 나그네", desc: "도르래를 30번 탄다", goal: 30, val: () => save.stats.trolleys || 0 },
   { id: "fog50", name: "숨 참는 자", desc: "독안개를 50번 무사히 빠져나온다", goal: 50, val: () => save.stats.fogs || 0 },
   { id: "spare", name: "칼을 거둔 자", desc: "불살 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.spare).length, val: () => LEVELS.reduce((n, l, i) => n + (l.spare && save.best[i] ? 1 : 0), 0) },
+  { id: "bossall", name: "보스 사냥꾼", desc: "보스전을 모두 깬다", goal: BOSSES.length, val: () => BOSSES.filter((_, k) => [0, 1, 2].some((d) => save.boss[d + ":" + k])).length },
   { id: "boss", name: "백야의 끝", desc: "백야후를 쓰러뜨린다", goal: 1, val: () => (LEVELS.some((l, i) => save.best[i] && l.map.some((r) => r.includes("0"))) ? 1 : 0) },
   { id: "dive", name: "물의 그림자", desc: "물속에 30번 잠수한다", goal: 30, val: () => save.stats.dives || 0 },
   { id: "hunt", name: "사냥꾼의 사냥꾼", desc: "추적자를 10명 처치한다", goal: 10, val: () => save.stats.huntKills || 0 },
@@ -1845,6 +1850,7 @@ function win() {
   setTimeout(checkAchievements, 1400); // after the stage's own toasts
   if (daily) { dailyCleared(); return; }
   if (cur === BONUS_I) { bonusCleared(); return; }
+  if (cur > BONUS_I) { bossCleared(cur - BONUS_I - 1); return; }
   const prev = bestTable()[cur];
   const stars = starsOf(cur, runTime, runDeaths);
   const rec = { time: runTime, deaths: runDeaths, stars: Math.max(stars, (prev && prev.stars) || 0) };
@@ -1880,6 +1886,21 @@ function bonusCleared() {
     next: "메뉴로", retry: "다시 도전", menuBtn: false,
   });
 }
+// Each boss keeps one record per difficulty and never touches campaign progress or stars.
+function bossCleared(k) {
+  const key = diff + ":" + k, prev = save.boss[key], better = !prev || runTime < prev.time;
+  if (better) { save.boss[key] = { time: runTime, deaths: runDeaths }; storeGhost(BOSS_I(k), ghostRec); }
+  writeSave();
+  showWin({
+    act: "보스전 · " + BOSSES[k].name + (hard ? " · " + DIFF_NAME[diff] : ""),
+    title: prev ? (better ? "보스전 신기록" : "다시 쓰러뜨렸다") : "보스 격파",
+    stars: null, starNote: BOSSES[k].sub || "보스전 · 별 대신 기록이 남는다",
+    time: runTime.toFixed(1) + "초", deaths: runDeaths,
+    best: (better ? runTime : prev.time).toFixed(1) + "초" + (better && prev ? " ★" : ""),
+    next: "메뉴로", retry: "다시 도전", menuBtn: false,
+  });
+}
+export function playBoss(k) { ensureAudio(); run = null; startLevel(BOSS_I(k), false); }
 export function showMenu() {
   setMode("menu");
   run = null;
@@ -1921,6 +1942,7 @@ export function menuInfo() {
       return { k, a, b, title: c.title, clear, stars, locked: a >= save.unlocked };
     }),
     stats: playStats(),
+    bosses: BOSSES.map((b, k) => { const r = save.boss[diff + ":" + k]; return { k, name: b.name, sub: b.sub, best: r ? r.time.toFixed(1) + "초" : null, cleared: !!r }; }),
     bonus: { label: "보너스 · 초고난도" + (save.bonus[diff] ? ` · 최고 ${save.bonus[diff].time.toFixed(1)}초` : ""), cleared: !!save.bonus[diff] },
     story: (() => {
       const list = CHAPTERS.map((c, k) => ({ key: k, label: `제${k + 1}장 · ${c.title}`, open: save.unlocked > c.from }));

@@ -53,6 +53,7 @@ function Menu({ info, shown, touch, muted, install }) {
           <button id="bDaily" type="button" onClick={game.playDaily}>{info.daily}</button>
           <button id="bHard" type="button" aria-pressed={String(info.hard)} className={info.master ? "master" : undefined} onClick={game.cycleDifficulty}>난이도 · {info.diffName}</button>
           <button id="bBonus" type="button" className={"bonus" + (info.bonus.cleared ? " cleared" : "")} title="칠흑 · 불길 추격 · 썩은 들보 · 깃발 없음" onClick={game.playBonus}>{info.bonus.label}</button>
+          <button id="bBoss" type="button" className="bossbtn" onClick={() => { const d = document.querySelector(".fold.boss"); if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } }}>보스전</button>
           <button id="bInstall" type="button" hidden={!install.shown} onClick={game.installClick}>앱 설치</button>
         </div>
         <details className="fold" id="settings">
@@ -110,6 +111,17 @@ function Menu({ info, shown, touch, muted, install }) {
         <div className="levels" id="levelList">
           {shownLevels.map((lv) => <LevelTile key={lv.i} lv={lv} />)}
         </div>
+        <details className="fold boss" open>
+          <summary>보스전 {info.bosses.filter((b) => b.cleared).length}/{info.bosses.length}</summary>
+          <p>본편 진행과 상관없이 언제든 도전할 수 있다. 보스마다 쓰러뜨리는 방법이 다르고, 기록은 난이도마다 따로 남는다.</p>
+          <div className="srgrid" id="bossList">
+            {info.bosses.map((b) => (
+              <button key={b.k} type="button" className={"srb" + (b.cleared ? " done" : "")} id={"boss" + b.k} onClick={() => game.playBoss(b.k)}>
+                <b>{b.name}</b><small>{b.best ? `최고 ${b.best}` : b.sub}</small>
+              </button>
+            ))}
+          </div>
+        </details>
         <details className="fold sr">
           <summary id="srTitle">{info.srTitle}</summary>
           <p>구간의 막을 쉬지 않고 이어서 깬다. 시간은 막 사이에 멈추고, 죽거나 재시작해도 계속 흐른다. 구간의 막을 모두 열어야 도전할 수 있다.</p>
