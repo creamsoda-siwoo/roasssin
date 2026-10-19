@@ -1319,6 +1319,12 @@ function updateGuards(dt) {
     if (g.kind !== "hunter" && mode === "play" && (canSee(g) || canSeeCaptive(g))) { g.seeT += dt; if (g.seeT >= SEE_LIMIT) detected(g); }
     else g.seeT = Math.max(0, g.seeT - dt * 0.7);
 
+    if (mode === "play" && overlap(p, g) && g.boss && g.bst) {
+      if (g.hurtT > 0) continue;
+      if (g.bst === "stun" || g.bst === "daze" || (p.vy > 40 && p.y + p.h - g.y < 16)) { killGuard(g); if (p.vy > 40) p.vy = -300; continue; }
+      if (p.invul <= 0) detected(g);
+      continue;
+    }
     if (mode === "play" && overlap(p, g)) {
       const behind = g.dir * ((p.x + p.w / 2) - (g.x + g.w / 2)) < 0;
       const above = p.vy > 40 && p.y + p.h - g.y < 16;
@@ -1332,7 +1338,90 @@ function updateGuards(dt) {
 // shout and run at you (faster on harder modes, slower than you). Walls, ledge edges, pits, spikes and shut doors
 // stop them, and they cannot climb. Out of sight (hidden, or simply gone) they halt, search HUNT_LOSE s and settle.
 const HUNT_LOSE = 2.0;
+// Action bosses (level.bossMoves: "charge" and/or "throw"): they see the whole arena, glare ("!") and then
+// charge until they hit a wall (and stand stunned, open to a blow from any side) or throw a fast knife at you.
+// Each blow knocks them back dazed; they speed up as they weaken.
+const BOSS_AIM = 0.6, BOSS_CHARGE_V = 430, BOSS_STUN = 1.8, BOSS_DAZE = 1.7, BOSS_COOL = 2.6, KNIFE_V = 600;
+function bossSees(g) {
+  const p = L.player;
+  if (p.cloak > 0 || p.invul > 0 || inBush(p) || inFog(p) || underWater(p)) return false;
+  const ex = g.x + g.w / 2, ey = g.y + 8;
+  for (const [px, py] of [[p.x + p.w / 2, p.y + p.h / 2], [p.x + p.w / 2, p.y + 4]]) {
+    const dx = px - ex, dy = py - ey;
+    if (Math.hypot(dx, dy) > VIS * 3 || Math.atan2(Math.abs(dy), Math.abs(dx)) > 0.62) continue;
+    if (segClear(ex, ey, px, py, 0, 0, true)) return true;
+  }
+  return false;
+}
+function updateActionBoss(g, dt, moves) {
+  const p = L.player, spd = 1 + 0.18 * ((g.maxHp || 3) - g.hp);
+  g.t = (g.t || 0) - dt; if (g.hurtT > 0) g.hurtT -= dt;
+  const face = () => { const d = Math.sign(p.x + p.w / 2 - (g.x + g.w / 2)); if (d) g.dir = d; };
+  if (!g.bst) g.bst = "idle";
+  if (g.bst === "idle") {
+    g.turnT -= dt; if (g.turnT <= 0) { g.dir *= -1; g.turnT = WATCH_T * 1.4; }
+    if (mode === "play" && bossSees(g)) { face(); g.bst = "aim"; g.t = BOSS_AIM / spd; sfx.alert(); }
+  } else if (g.bst === "aim") {
+    face();
+    if (g.t <= 0) {
+      g.mv = (g.mv || 0) + 1;
+      const pick = moves.length > 1 ? moves[g.mv % moves.length] : moves[0];
+      if (pick === "charge") { g.bst = "charge"; g.run = 0; sfx.toggle(); }
+      else {
+        L.knives = L.knives || [];
+        L.knives.push({ x: g.x + g.w / 2 + g.dir * 12, y: g.y + 12, vx: g.dir * KNIFE_V * Math.min(spd, 1.3), spin: 0 });
+        sfx.fire(); g.bst = "cool"; g.t = BOSS_COOL / spd;
+      }
+    }
+  } else if (g.bst === "charge") {
+    const v = BOSS_CHARGE_V * spd, nx = g.x + g.dir * v * dt, fx = g.dir > 0 ? nx + g.w + 1 : nx - 1;
+    const tx = Math.floor(fx / TS), tyMid = Math.floor((g.y + g.h / 2) / TS), tyFeet = Math.floor((g.y + g.h - 2) / TS), tyBelow = Math.floor((g.y + g.h + 2) / TS);
+    const wall = isSolid(tx, tyMid), edge = !isSolid(tx, tyBelow) || tileAt(tx, tyFeet) === "^";
+    if (wall || edge || g.run > 60 * TS) {
+      g.bst = wall ? "stun" : "cool"; g.t = wall ? BOSS_STUN : 0.8;
+      if (wall) { sfx.crack(); buzz(30); burst(g.x + g.w / 2 + g.dir * 12, g.y + 12, 14, "#c9a45a", 160); }
+    } else { g.x = nx; g.run += v * dt; }
+  } else if (g.bst === "stun" || g.bst === "daze") {
+    if (g.t <= 0) { g.bst = "cool"; g.t = 0.4; face(); }
+  } else if (g.bst === "cool") {
+    if (g.t <= 0) { g.bst = "idle"; g.turnT = WATCH_T; face(); }
+  }
+}
+function updateKnives(dt) {
+  if (!L.knives || !L.knives.length) return;
+  const p = L.player;
+  for (const k of L.knives) {
+    k.x += k.vx * dt; k.spin += dt * 20;
+    if (isSolid(Math.floor(k.x / TS), Math.floor(k.y / TS))) { k.dead = true; burst(k.x, k.y, 5, "#c8ccd8", 100); continue; }
+    if (mode === "play" && p.invul <= 0 && k.x > p.x && k.x < p.x + p.w && k.y > p.y && k.y < p.y + p.h) { k.dead = true; die("표창에 맞았다"); }
+  }
+  L.knives = L.knives.filter((k) => !k.dead && k.x > -40 && k.x < L.W * TS + 40);
+}
+function drawKnives() {
+  if (!L.knives) return;
+  for (const k of L.knives) {
+    ctx.save(); ctx.translate(k.x, k.y); ctx.rotate(k.spin);
+    ctx.fillStyle = "#d8dce8"; ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(2, 0); ctx.lineTo(0, 7); ctx.lineTo(-2, 0); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(0, 2); ctx.lineTo(7, 0); ctx.lineTo(0, -2); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+// The boss's name and health across the top of the screen.
+function drawBossBar(w) {
+  const b = L && L.guards.find((g) => g.boss);
+  if (!b) return;
+  const name = lvAt(cur).bossName || "백야후", mh = b.maxHp || 3, bw = Math.min(360, w * 0.5), x = (w - bw) / 2, y = 70;
+  ctx.fillStyle = "rgba(10,8,16,0.72)"; ctx.fillRect(x - 10, y - 22, bw + 20, 36);
+  ctx.fillStyle = "#e8c15a"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center"; ctx.fillText(name + (b.alive ? "" : " · 쓰러짐"), w / 2, y - 7);
+  for (let k = 0; k < mh; k++) {
+    const sw = (bw - (mh - 1) * 4) / mh;
+    ctx.fillStyle = b.alive && k < b.hp ? (b.bst === "stun" || b.bst === "daze" ? "#ffd47a" : "#d0583f") : "rgba(255,255,255,0.12)";
+    ctx.fillRect(x + k * (sw + 4), y, sw, 7);
+  }
+}
 function updateHunter(g, dt) {
+  const moves = g.boss && lvAt(cur).bossMoves;
+  if (moves) return updateActionBoss(g, dt, moves);
   const p = L.player, sees = mode === "play" && (canSee(g) || canSeeCaptive(g));
   if (sees) {
     if (!g.chase) { g.chase = true; g.alert = 1; sfx.alert(); toast("추적자가 쫓아온다!", true); bump("hunted"); }
@@ -1360,6 +1449,11 @@ function drawHunters(t) {
       ctx.fillStyle = "#e8c15a"; ctx.fillRect(cx - 7, g.y - 6, 14, 4); for (const k of [-6, 0, 6]) ctx.fillRect(cx + k - 1, g.y - 10, 3, 4);
       const mh = g.maxHp || 3;
       for (let k = 0; k < mh; k++) { ctx.fillStyle = k < g.hp ? "#d0583f" : "rgba(255,255,255,0.2)"; ctx.fillRect(cx - mh * 4.5 + 1 + k * 9, g.y - 18, 7, 4); }
+      if (g.bst === "aim") { ctx.fillStyle = Math.sin(t * 30) > 0 ? "#ff6a4a" : "#ffd47a"; ctx.font = "bold 20px sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", cx, g.y - 24); }
+      if (g.bst === "stun" || g.bst === "daze") for (let k = 0; k < 3; k++) {
+        const a = t * 5 + k * 2.1; ctx.fillStyle = "#ffd47a"; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * 12, g.y - 26 + Math.sin(a) * 4, 3, 0, Math.PI * 2); ctx.fill();
+      }
+      if (g.bst === "charge") for (let k = 0; k < 3; k++) { ctx.fillStyle = "rgba(201,164,90,0.5)"; ctx.beginPath(); ctx.arc(cx - g.dir * (14 + k * 9), g.y + g.h - 4, 4 - k, 0, Math.PI * 2); ctx.fill(); }
     }
     ctx.fillStyle = g.chase ? "#d0583f" : "#7a3a5a"; ctx.fillRect(g.x + 1, g.y + 14, g.w - 2, 4);
     ctx.fillStyle = g.chase ? "#ff6a4a" : "#c98ab0"; ctx.fillRect(cx + g.dir * 4 - 2, g.y + 6, 4, 2);
@@ -1376,10 +1470,16 @@ function killGuard(g) {
     g.hp--;
     const post = L.bossPosts && L.bossPosts[String((g.maxHp || 3) - g.hp)];
     burst(g.x + g.w / 2, g.y + 10, 22, "#8f2a2a", 240); sfx.kill(); buzz(40);
-    if (post) { g.x = post.x * TS + 6; g.y = post.y * TS + TS - 30; }
-    Object.assign(g, { chase: false, alert: 0, lost: 0, search: 0, dir: -1, turnT: WATCH_T * 1.4 });
+    if (post) { g.x = post.x * TS + 6; g.y = post.y * TS + TS - 30; Object.assign(g, { chase: false, alert: 0, lost: 0, search: 0, dir: -1, turnT: WATCH_T * 1.4, bst: g.bst && "idle" }); }
+    else if (g.bst) {
+      // leap back toward the roomier side of the arena, so the next charge has a run-up you can read
+      const room = (d) => { let n = 0; for (let x = g.x; n < 8 * TS; n += 4, x += d * 4) { const fx = d > 0 ? x + g.w + 4 : x - 4; if (isSolid(Math.floor(fx / TS), Math.floor((g.y + g.h / 2) / TS)) || !isSolid(Math.floor(fx / TS), Math.floor((g.y + g.h + 2) / TS))) break; } return n; };
+      const away = room(1) >= room(-1) ? 1 : -1, go = Math.min(4 * TS, room(away));
+      g.x += away * go; burst(g.x + g.w / 2, g.y + g.h, 8, "#c9a45a", 120);
+      Object.assign(g, { bst: "daze", t: BOSS_DAZE, hurtT: 1.0, dir: -away });
+    } else Object.assign(g, { chase: false, alert: 0, lost: 0, search: 0, dir: -1, turnT: WATCH_T * 1.4 });
     L.player.invul = Math.max(L.player.invul, 0.6);
-    toast(`백야후가 비틀거리며 물러난다 · 남은 힘 ${g.hp}`, true);
+    toast(`${lvAt(cur).bossName || "백야후"}가 비틀거린다 · 남은 힘 ${g.hp}`, true);
     return;
   }
   if (L.spare && !g.target) { die(L.guards.some((q) => q.target) ? "표적이 아닌 자를 해쳤다" : "불살의 맹세를 어겼다"); return; }
@@ -2852,6 +2952,7 @@ function drawVignette() {
     lamp.addColorStop(0, "rgba(4,2,8,0)"); lamp.addColorStop(1, "rgba(4,2,8,0.96)");
     ctx.fillStyle = lamp; ctx.fillRect(0, 0, w, h);
   }
+  if (inGame && L) drawBossBar(w);
   if (mode === "dead") { ctx.fillStyle = `rgba(120,20,20,${0.25 * Math.max(0, 1 - deadT)})`; ctx.fillRect(0, 0, w, h); }
 }
 
@@ -2881,6 +2982,7 @@ function render(t) {
     drawGuards(t);
     drawTargets(t);
     drawHunters(t);
+    drawKnives();
     drawCaptive(t);
     drawPapers(t);
     drawRope(t);
@@ -2915,6 +3017,7 @@ function step(dt) {
     if (L.limit && mode === "play") { L.limT += dt; if (L.limT >= L.limit) die("시간이 다 됐다"); }
     updateTrolleys(dt);
     updateCaptive(dt);
+    updateKnives(dt);
     updateIcicles(dt);
     updateSprings(dt);
     updateWorld(dt);
