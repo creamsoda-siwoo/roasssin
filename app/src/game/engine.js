@@ -39,9 +39,9 @@ const REBUILT = [43, 58, 66, 70, 92, 98, 107, 112, 113, 119, 121, 125, 126, 127,
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {}, bonusGhost: !!s.bonusGhost, boss: s.boss || {} };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {}, bonusGhost: !!s.bonusGhost, boss: s.boss || {}, tower: s.tower || {} };
   } catch (e) {}
-  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {}, bonus: {}, boss: {}, bonusGhost: true };
+  return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {}, bonus: {}, boss: {}, tower: {}, bonusGhost: true };
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
@@ -81,6 +81,7 @@ const DAILY_MODS = [
   { name: "칠흑", desc: "등불 하나만 비춘다" },
 ];
 let daily = null; // the challenge being played right now, or null
+let tower = null; // the Tower of Trials climb in progress, or null
 function dayKey(off = 0) { const d = new Date(Date.now() + off * 864e5); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
 function todaysDaily() {
   const today = dayKey();
@@ -144,7 +145,7 @@ function applyDifficulty() {
   REGROW_T = [4, 6, 8][diff];
   PATROL_V = [60, 85, 115][diff];
   WATCH_T = [2.6, 1.6, 1.1][diff];
-  const m = daily ? daily.mod : -1;
+  const m = daily ? daily.mod : tower ? tower.mod : -1;
   GRAV = m === 0 ? 1190 : 1700;
   RUN = m === 2 ? 286 : 220;
   if (m === 1) { PATROL_V *= 1.5; WATCH_T *= 0.6; SEE_LIMIT *= 0.5; }
@@ -1509,6 +1510,7 @@ function die(reason) {
     return;
   }
   setMode("dead"); deadT = 0; runDeaths++; if (run) run.deaths++;
+  if (tower) { tower.lives--; tower.deaths++; update("hud", { act: towerAct() }); }
   bump("deaths"); save.stats.clean = 0; writeSave();
   const p = L.player;
   burst(p.x + p.w / 2, p.y + p.h / 2, 26, "#0d0d12", 260);
@@ -1711,6 +1713,7 @@ function startLevel(i, keepStats) {
   cur = i;
   L = buildLevel(i);
   if (skin().shield) L.player.shield = true;
+  if (tower && !keepStats) towerFloorStart();
   // stage rules: spare (no guard may be harmed), hooks (a fixed number of hook throws), limit (seconds to reach the exit)
   const rule = lvAt(i);
   L.spare = !!rule.spare; L.hooksLeft = rule.hooks != null ? rule.hooks : null; L.limit = rule.limit || 0; L.limT = 0;
@@ -1724,7 +1727,7 @@ function startLevel(i, keepStats) {
   if (!keepStats) {
     runTime = 0; runDeaths = 0; showCard(); ghostRec = [];
     const g = ghosts[ghostId(i)];
-    ghostPlay = g && !daily ? g.d.split(",").map((v) => parseInt(v, 36)) : null;
+    ghostPlay = g && !daily && !tower ? g.d.split(",").map((v) => parseInt(v, 36)) : null;
   }
   setMode("play");
   jumpQueued = false;
@@ -1732,7 +1735,7 @@ function startLevel(i, keepStats) {
   keepAwake(true);
   fadeGoal();
   update("hud", {
-    act: (i === BONUS_I ? "보너스 · 초고난도" : i > BONUS_I ? `보스전 ${i - BONUS_I} / ${BOSSES.length}` : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : ""),
+    act: (i === BONUS_I ? "보너스 · 초고난도" : i > BONUS_I ? `보스전 ${i - BONUS_I} / ${BOSSES.length}` : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : "") + (tower ? " · " + towerTag() : ""),
     hard, master, name: lvAt(i).name, goal: lvAt(i).goal,
   });
   syncHintText();
@@ -1850,8 +1853,8 @@ function dailyCleared() {
     next: "메뉴로", retry: "다시 도전", menuBtn: false,
   });
 }
-export function winNext() { if (mode !== "win") return; if (daily) { showMenu(); return; } if (run) { run = null; showMenu(); } else nextLevel(); }
-export function winRetry() { if (mode !== "win") return; if (run) startRun(run.a, run.b); else startLevel(cur, false); }
+export function winNext() { if (mode !== "win") return; if (tower) { towerPick(0); return; } if (daily) { showMenu(); return; } if (run) { run = null; showMenu(); } else nextLevel(); }
+export function winRetry() { if (mode !== "win") return; if (tower) { towerPick(1); return; } if (run) startRun(run.a, run.b); else startLevel(cur, false); }
 function runStageCleared() {
   if (cur < run.b) {
     toast(`${ACTS[cur]} 통과 · ${run.t.toFixed(1)}초`);
@@ -1933,6 +1936,9 @@ const ACHIEVEMENTS = [
   { id: "mark", name: "그림자 집행자", desc: "표적이 있는 막을 모두 깬다", goal: LEVELS.filter((l) => l.map.some((r) => /[kq]/.test(r))).length, val: () => LEVELS.reduce((n, l, i) => n + (save.best[i] && l.map.some((r) => /[kq]/.test(r)) ? 1 : 0), 0) },
   { id: "thief", name: "불길 속의 도둑", desc: "문서를 훔쳐 달아나는 막을 모두 깬다", goal: LEVELS.filter((l) => l.escape).length, val: () => LEVELS.reduce((n, l, i) => n + (l.escape && save.best[i] ? 1 : 0), 0) },
   { id: "clock", name: "시간의 주인", desc: "제한 시간 규칙이 붙은 막을 모두 깬다", goal: LEVELS.filter((l) => l.limit).length, val: () => LEVELS.reduce((n, l, i) => n + (l.limit && save.best[i] ? 1 : 0), 0) },
+  { id: "tw5", name: "탑의 문턱", desc: "시련의 탑 5층을 돌파한다", goal: 5, val: () => Math.max(0, ...Object.values(save.tower)) },
+  { id: "tw15", name: "구름 위의 자객", desc: "시련의 탑 15층을 돌파한다", goal: 15, val: () => Math.max(0, ...Object.values(save.tower)) },
+  { id: "tw30", name: "하늘에 닿은 줄", desc: "시련의 탑 30층을 돌파한다", goal: 30, val: () => Math.max(0, ...Object.values(save.tower)) },
   { id: "epi", name: "이야기의 끝", desc: "에필로그를 본다", goal: 1, val: () => (save.story && save.story.end ? 1 : 0) },
 ];
 function checkAchievements() {
@@ -1949,6 +1955,7 @@ function win() {
   if (runDeaths === 0) { bump("clean"); save.stats.cleanBest = Math.max(save.stats.cleanBest || 0, save.stats.clean); }
   setTimeout(checkAchievements, 1400); // after the stage's own toasts
   if (daily) { dailyCleared(); return; }
+  if (tower) { towerCleared(); return; }
   if (cur === BONUS_I) { bonusCleared(); return; }
   if (cur > BONUS_I) { bossCleared(cur - BONUS_I - 1); return; }
   const prev = bestTable()[cur];
@@ -2000,11 +2007,96 @@ function bossCleared(k) {
     next: "메뉴로", retry: "다시 도전", menuBtn: false,
   });
 }
+// Tower of Trials: random stages one floor after another on a few lives. Deeper floors draw harder stages,
+// often carry a curse (a daily-challenge twist), and every fifth floor is a boss. Between floors you pick one of two blessings.
+const TOWER_LIVES = 3, TOWER_MAX_LIVES = 6;
+const BLESSINGS = [
+  { id: "life", name: "생명의 등불", desc: "목숨 +1" },
+  { id: "ward", name: "수호 부적", desc: "다음 층을 부적을 지닌 채 시작" },
+  { id: "calm", name: "고요한 밤", desc: "다음 층엔 저주가 없다" },
+  { id: "cloak", name: "그림자 망토", desc: "다음 층 시작 10초 투명" },
+  { id: "boots", name: "바람 신발", desc: "다음 층 시작 15초 2단 점프" },
+  { id: "easy", name: "샛길", desc: "다음 층은 쉬운 막이 나온다" },
+];
+const towerBest = () => save.tower[diff] || 0;
+const towerTag = () => `시련의 탑 ${tower.floor}층 · ♥${Math.max(0, tower.lives)}` + (tower.mod >= 0 ? ` · 저주(${DAILY_MODS[tower.mod].name})` : "");
+const towerAct = () => (cur > BONUS_I ? `보스전 · ${lvAt(cur).name}` : ACTS[cur]) + " · " + towerTag();
+const rnd = (n) => Math.floor(Math.random() * n);
+function startTower() {
+  run = null; daily = null;
+  tower = { floor: 0, lives: TOWER_LIVES, deaths: 0, time: 0, mod: -1, buffs: {}, seen: new Set(), offer: null };
+  towerNext();
+}
+function towerNext() {
+  const t = tower, f = ++t.floor, b = t.buffs;
+  t.mod = b.calm || f < 3 || Math.random() > Math.min(0.75, 0.3 + f * 0.03) ? -1 : rnd(DAILY_MODS.length);
+  let i;
+  if (f % 5 === 0) i = BOSS_I(rnd(BOSSES.length));
+  else {
+    const hi = b.easy ? Math.min(LEVELS.length, 60 + f * 8) : Math.min(LEVELS.length, 40 + f * 30), lo = Math.max(4 + f * 2, hi - (b.easy ? 60 : 160));
+    for (let k = 0; k < 20; k++) { i = lo + rnd(hi - lo); if (!t.seen.has(i)) break; }
+  }
+  t.seen.add(i); t.start = b; t.buffs = {};
+  applyDifficulty();
+  startLevel(i, false);
+  const m = t.mod >= 0 ? ` · 저주 ${DAILY_MODS[t.mod].name}: ${DAILY_MODS[t.mod].desc}` : "";
+  toast(f % 5 === 0 ? `시련의 탑 ${f}층 · 보스가 기다린다${m}` : `시련의 탑 ${f}층${m}`);
+}
+// Blessings picked on the last floor take effect as the new floor begins.
+function towerFloorStart() {
+  const b = tower.start || {}, p = L.player;
+  if (b.ward) p.shield = true;
+  if (b.cloak) p.cloak = 10;
+  if (b.boots) p.boots = 15;
+}
+function towerCleared() {
+  const t = tower;
+  t.time += runTime;
+  const better = t.floor > towerBest();
+  if (better) save.tower[diff] = t.floor;
+  bump("towerFloors"); writeSave();
+  const pool = BLESSINGS.filter((x) => x.id !== "life" || t.lives < TOWER_MAX_LIVES);
+  const a = pool.splice(rnd(pool.length), 1)[0], c = pool[rnd(pool.length)];
+  t.offer = [a, c];
+  showWin({
+    act: `시련의 탑 · ${t.floor}층 돌파 · ♥${t.lives}` + (hard ? " · " + DIFF_NAME[diff] : ""),
+    title: better && t.floor > 1 ? `${t.floor}층 · 새 최고 기록` : `${t.floor}층 돌파`,
+    stars: null, starNote: `축복을 하나 고르고 ${t.floor + 1}층으로 오른다 · ${a.name}: ${a.desc} / ${c.name}: ${c.desc}`,
+    time: runTime.toFixed(1) + "초", deaths: runDeaths, best: towerBest() + "층",
+    next: a.name, retry: c.name, menuBtn: true,
+  });
+}
+function towerPick(k) {
+  const t = tower;
+  if (t.over) { if (k === 0) showMenu(); else startTower(); return; }
+  const b = t.offer[k];
+  if (b.id === "life") t.lives = Math.min(TOWER_MAX_LIVES, t.lives + 1);
+  else t.buffs[b.id] = true;
+  toast(`축복 · ${b.name} · ${b.desc}`);
+  towerNext();
+}
+function towerOver() {
+  const t = tower, n = t.floor - 1;
+  t.over = true; t.time += runTime;
+  setMode("win");
+  sfx.die();
+  writeSave();
+  showWin({
+    act: "시련의 탑" + (hard ? " · " + DIFF_NAME[diff] : ""),
+    title: `${t.floor}층에서 쓰러졌다` + (n > 0 && n >= towerBest() ? " · 최고 기록" : ""),
+    stars: null, starNote: `오른 층 ${n} · 최고 ${towerBest()}층 · 다음엔 더 높이`,
+    time: t.time.toFixed(1) + "초", deaths: t.deaths, best: towerBest() + "층",
+    next: "메뉴로", retry: "다시 오르기", menuBtn: false,
+  });
+  setTimeout(checkAchievements, 1400);
+}
+export function playTower() { ensureAudio(); startTower(); }
 export function playBoss(k) { ensureAudio(); run = null; startLevel(BOSS_I(k), false); }
 export function showMenu() {
   setMode("menu");
   run = null;
   if (daily) { daily = null; applyDifficulty(); }
+  if (tower) { tower = null; applyDifficulty(); }
   keepAwake(false);
   todaysDaily();
   checkAchievements();
@@ -2043,6 +2135,7 @@ export function menuInfo() {
     }),
     stats: playStats(),
     bosses: BOSSES.map((b, k) => { const r = save.boss[diff + ":" + k]; return { k, name: b.name, sub: b.sub, best: r ? r.time.toFixed(1) + "초" : null, cleared: !!r }; }),
+    tower: { label: "시련의 탑" + (towerBest() ? ` · 최고 ${towerBest()}층` : ""), best: towerBest() },
     bonus: { label: "보너스 · 초고난도" + (save.bonus[diff] ? ` · 최고 ${save.bonus[diff].time.toFixed(1)}초` : ""), cleared: !!save.bonus[diff] },
     story: (() => {
       const list = CHAPTERS.map((c, k) => ({ key: k, label: `제${k + 1}장 · ${c.title}`, open: save.unlocked > c.from }));
@@ -2078,6 +2171,7 @@ function playStats() {
     ["쓰러진 횟수", n("deaths")],
     ["무사고 연속 최고", n("cleanBest") + "막"],
     ["오늘의 도전 연속", (save.streak || 0) + "일"],
+    ["시련의 탑 최고", towerBest() + "층"],
   ];
 }
 export function playLevel(i) { ensureAudio(); beginLevel(i); }
@@ -2945,7 +3039,7 @@ function drawVignette() {
     g.fillStyle = v; g.fillRect(0, 0, W, H);
     if (hv) { g.fillStyle = "rgba(120,20,30,0.08)"; g.fillRect(0, 0, W, H); }
   }), 0, 0, w, h);
-  if ((master || (daily && daily.mod === 3) || lvAt(cur).dark) && inGame && L.player) {
+  if ((master || (daily && daily.mod === 3) || (tower && tower.mod === 3) || lvAt(cur).dark) && inGame && L.player) {
     const p = L.player, px = (p.x + p.w / 2 - cam.x) * scale, py = (p.y + p.h / 2 - cam.y) * scale;
     const r = TS * scale;
     const lamp = ctx.createRadialGradient(px, py, r * 2.2, px, py, r * 6.5);
@@ -3024,7 +3118,8 @@ function step(dt) {
   } else if (mode === "dead") {
     deadT += dt;
     updateCrates(dt);
-    if (deadT > 0.65) { if (L.checkpoint) respawnAtCheckpoint(); else restartLevel(); }
+    if (deadT > 0.65 && tower && tower.lives <= 0) towerOver();
+    else if (deadT > 0.65) { if (L.checkpoint) respawnAtCheckpoint(); else restartLevel(); }
   }
   if (L) updateParticles(dt);
 }
