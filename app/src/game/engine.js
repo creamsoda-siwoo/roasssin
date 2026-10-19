@@ -215,6 +215,7 @@ const keys = {};
 let jumpQueued = false;
 const mouse = { sx: VW / 2, sy: VH / 2 };
 function onKeyDown(e) {
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return; // typing a stage name or a share code
   ensureAudio();
   if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
   if (e.repeat) { keys[e.code] = true; return; }
@@ -313,8 +314,11 @@ let L = null, cur = 0, mode = "menu";
 const BONUS_I = LEVELS.length;
 // Boss fights sit after the bonus: open from the menu from the start, with their own records.
 const BOSS_I = (k) => BONUS_I + 1 + k;
-const lvAt = (i) => (i === BONUS_I ? BONUS : i > BONUS_I ? BOSSES[i - BONUS_I - 1] : LEVELS[i]);
-const actAt = (i) => (i === BONUS_I ? "보너스" : i > BONUS_I ? "보스전" : ACTS[i]);
+// A stage drawn in the editor plays at its own index, past every boss.
+const CUSTOM_I = BOSS_I(BOSSES.length);
+let custom = null;
+const lvAt = (i) => (i === CUSTOM_I ? custom : i === BONUS_I ? BONUS : i > BONUS_I ? BOSSES[i - BONUS_I - 1] : LEVELS[i]);
+const actAt = (i) => (i === CUSTOM_I ? "나만의 막" : i === BONUS_I ? "보너스" : i > BONUS_I ? "보스전" : ACTS[i]);
 let runTime = 0, runDeaths = 0, deadT = 0;
 const cam = { x: 0, y: 0 };
 
@@ -1727,7 +1731,7 @@ function startLevel(i, keepStats) {
   if (!keepStats) {
     runTime = 0; runDeaths = 0; showCard(); ghostRec = [];
     const g = ghosts[ghostId(i)];
-    ghostPlay = g && !daily && !tower ? g.d.split(",").map((v) => parseInt(v, 36)) : null;
+    ghostPlay = g && !daily && !tower && i !== CUSTOM_I ? g.d.split(",").map((v) => parseInt(v, 36)) : null;
   }
   setMode("play");
   jumpQueued = false;
@@ -1735,7 +1739,7 @@ function startLevel(i, keepStats) {
   keepAwake(true);
   fadeGoal();
   update("hud", {
-    act: (i === BONUS_I ? "보너스 · 초고난도" : i > BONUS_I ? `보스전 ${i - BONUS_I} / ${BOSSES.length}` : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : "") + (tower ? " · " + towerTag() : ""),
+    act: (i === CUSTOM_I ? "나만의 막 · 시험 플레이" : i === BONUS_I ? "보너스 · 초고난도" : i > BONUS_I ? `보스전 ${i - BONUS_I} / ${BOSSES.length}` : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : "") + (tower ? " · " + towerTag() : ""),
     hard, master, name: lvAt(i).name, goal: lvAt(i).goal,
   });
   syncHintText();
@@ -1853,7 +1857,7 @@ function dailyCleared() {
     next: "메뉴로", retry: "다시 도전", menuBtn: false,
   });
 }
-export function winNext() { if (mode !== "win") return; if (tower) { towerPick(0); return; } if (daily) { showMenu(); return; } if (run) { run = null; showMenu(); } else nextLevel(); }
+export function winNext() { if (mode !== "win") return; if (cur === CUSTOM_I) { openEditor(); return; } if (tower) { towerPick(0); return; } if (daily) { showMenu(); return; } if (run) { run = null; showMenu(); } else nextLevel(); }
 export function winRetry() { if (mode !== "win") return; if (tower) { towerPick(1); return; } if (run) startRun(run.a, run.b); else startLevel(cur, false); }
 function runStageCleared() {
   if (cur < run.b) {
@@ -1956,6 +1960,7 @@ function win() {
   setTimeout(checkAchievements, 1400); // after the stage's own toasts
   if (daily) { dailyCleared(); return; }
   if (tower) { towerCleared(); return; }
+  if (cur === CUSTOM_I) { customCleared(); return; }
   if (cur === BONUS_I) { bonusCleared(); return; }
   if (cur > BONUS_I) { bossCleared(cur - BONUS_I - 1); return; }
   const prev = bestTable()[cur];
@@ -2091,6 +2096,63 @@ function towerOver() {
   setTimeout(checkAchievements, 1400);
 }
 export function playTower() { ensureAudio(); startTower(); }
+// ---------- stage editor ----------
+// The editor (components/Editor.jsx) keeps its draft in its own key; testing builds the draft like any stage.
+const EDIT_KEY = "rope-assassin-edit-v1";
+export function loadDraft() { try { return JSON.parse(localStorage.getItem(EDIT_KEY) || "null"); } catch (e) { return null; } }
+export function saveDraft(d) { try { localStorage.setItem(EDIT_KEY, JSON.stringify(d)); } catch (e) {} }
+export function openEditor() {
+  setMode("editor");
+  run = null;
+  if (daily) { daily = null; applyDifficulty(); }
+  if (tower) { tower = null; applyDifficulty(); }
+  keepAwake(false);
+  setState({ overlay: "editor", hudShown: false });
+}
+// Returns an error message, or "" once the test run has started.
+export function testDraft(d) {
+  const t = d.map.join("");
+  if ((t.match(/P/g) || []).length !== 1) return "시작 지점(P)을 하나 놓아라";
+  if (!t.includes("E")) return "출구(E)를 하나 이상 놓아라";
+  if (/[Oo]/.test(t) && (t.match(/O/g) || []).length === 1) return "순간이동 문(O)은 둘 이상 있어야 이어진다";
+  if ((t.match(/Q/g) || []).length === 1) return "순간이동 문(Q)은 둘 이상 있어야 이어진다";
+  ensureAudio();
+  custom = { name: d.name || "이름 없는 막", goal: "직접 그린 막 · 출구까지 가라", hint: "", needsPower: true, map: d.map.slice() };
+  layerCache = null; // the map may have changed since the last test
+  run = null;
+  startLevel(CUSTOM_I, false);
+  return "";
+}
+function customCleared() {
+  const d = loadDraft();
+  if (d && d.map.join("\n") === custom.map.join("\n")) { d.cleared = true; d.best = d.best && d.best < runTime ? d.best : runTime; saveDraft(d); }
+  bump("customClears"); writeSave();
+  showWin({
+    act: "나만의 막 · " + custom.name,
+    title: "완주 확인",
+    stars: null, starNote: "이 막은 깰 수 있다 · 코드를 복사해 친구에게 보내라",
+    time: runTime.toFixed(1) + "초", deaths: runDeaths, best: (d && d.best ? d.best : runTime).toFixed(1) + "초",
+    next: "편집기로", retry: "다시 하기", menuBtn: true,
+  });
+}
+// Share codes: the map text, deflated when the browser can, as URL-safe base64 behind a version tag.
+const b64 = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64 = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+async function pipe(bytes, stream) { return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer()); }
+export async function draftCode(d) {
+  const text = new TextEncoder().encode(JSON.stringify({ n: d.name || "", m: d.map }));
+  if (typeof CompressionStream === "function") return "ZK1." + b64(await pipe(text, new CompressionStream("deflate-raw")));
+  return "ZK0." + b64(text);
+}
+export async function readCode(code) {
+  const [tag, body] = String(code).trim().split(".");
+  let bytes = unb64(body || "");
+  if (tag === "ZK1") bytes = await pipe(bytes, new DecompressionStream("deflate-raw"));
+  else if (tag !== "ZK0") throw new Error("tag");
+  const o = JSON.parse(new TextDecoder().decode(bytes));
+  if (!Array.isArray(o.m) || !o.m.length || o.m.length > 60 || o.m.some((r) => typeof r !== "string" || r.length > 200)) throw new Error("shape");
+  return { name: String(o.n || "").slice(0, 24), map: o.m };
+}
 export function playBoss(k) { ensureAudio(); run = null; startLevel(BOSS_I(k), false); }
 export function showMenu() {
   setMode("menu");

@@ -54,6 +54,7 @@ function Menu({ info, shown, touch, muted, install }) {
           <button id="bHard" type="button" aria-pressed={String(info.hard)} className={info.master ? "master" : undefined} onClick={game.cycleDifficulty}>난이도 · {info.diffName}</button>
           <button id="bBonus" type="button" className={"bonus" + (info.bonus.cleared ? " cleared" : "")} title="칠흑 · 불길 추격 · 썩은 들보 · 깃발 없음" onClick={game.playBonus}>{info.bonus.label}</button>
           <button id="bTower" type="button" className="towerbtn" title="무작위 막을 목숨 셋으로 오른다 · 층마다 저주 · 5층마다 보스 · 층 사이에 축복 고르기" onClick={game.playTower}>{info.tower.label}</button>
+          <button id="bEdit" type="button" className="editbtn" title="직접 막을 그리고, 시험해 보고, 코드로 나눈다" onClick={game.openEditor}>막 만들기</button>
           <button id="bBoss" type="button" className="bossbtn" onClick={() => { const d = document.querySelector(".fold.boss"); if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } }}>보스전</button>
           <button id="bInstall" type="button" hidden={!install.shown} onClick={game.installClick}>앱 설치</button>
         </div>

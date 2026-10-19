@@ -7,6 +7,7 @@ import Menu from "./components/Menu.jsx";
 import PauseBox from "./components/PauseBox.jsx";
 import WinBox from "./components/WinBox.jsx";
 import StoryBox from "./components/StoryBox.jsx";
+import Editor from "./components/Editor.jsx";
 
 export default function App() {
   const s = useSyncExternalStore(subscribe, getState);
@@ -42,6 +43,7 @@ export default function App() {
       <PauseBox shown={s.overlay === "pause"} act={s.pause.act} />
       <WinBox shown={s.overlay === "win"} win={s.win} />
       <StoryBox shown={s.overlay === "story"} story={s.story} />
+      <Editor shown={s.overlay === "editor"} />
     </>
   );
 }
