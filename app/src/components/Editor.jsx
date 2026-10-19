@@ -51,9 +51,22 @@ function Editor({ shown }) {
   const [tile, setTile] = useState("#");
   const [msg, setMsg] = useState("");
   const [code, setCode] = useState("");
-  const [pan, setPan] = useState(false);
-  const cvRef = useRef(null), painting = useRef(false), draftRef = useRef(draft);
+  const [tool, setTool] = useState("paint"); // paint | fill | pan
+  const pan = tool === "pan";
+  const cvRef = useRef(null), painting = useRef(false), draftRef = useRef(draft), history = useRef([]);
   draftRef.current = draft;
+  // every stroke, fill, resize or load first saves the map it is about to change
+  const remember = () => { history.current.push(draftRef.current.map); if (history.current.length > 100) history.current.shift(); };
+  const undo = () => {
+    const map = history.current.pop();
+    if (map) setDraft({ ...draftRef.current, map, cleared: false, best: null });
+  };
+  useEffect(() => {
+    if (!shown) return;
+    const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.code === "KeyZ" && !/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) { e.preventDefault(); undo(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [shown]);
   const W = Math.max(...draft.map.map((r) => r.length)), H = draft.map.length;
 
   // a test run may have marked the draft cleared; pick that up whenever the editor opens again
@@ -81,10 +94,28 @@ function Editor({ shown }) {
     for (let y = 0; y <= H; y++) { g.beginPath(); g.moveTo(0, y * CELL + 0.5); g.lineTo(W * CELL, y * CELL + 0.5); g.stroke(); }
   }, [draft, shown, W, H]);
 
-  const paintAt = (e, erase) => {
+  const cellOf = (e) => {
     const r = cvRef.current.getBoundingClientRect();
     const x = Math.floor(((e.clientX - r.left) / r.width) * W), y = Math.floor(((e.clientY - r.top) / r.height) * H);
-    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    return x < 0 || y < 0 || x >= W || y >= H ? null : [x, y];
+  };
+  // flood fill: every cell joined to (x, y) through the same tile becomes the chosen tile
+  const fillAt = (x, y, c) => {
+    const d = draftRef.current, from = d.map[y][x] || " ";
+    if (from === c || c === "P") return;
+    const g = d.map.map((row) => [...row.padEnd(W, " ")]), todo = [[x, y]];
+    while (todo.length) {
+      const [cx, cy] = todo.pop();
+      if (cx < 0 || cy < 0 || cx >= W || cy >= H || g[cy][cx] !== from) continue;
+      g[cy][cx] = c;
+      todo.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+    }
+    setDraft({ ...d, map: g.map((row) => row.join("")), cleared: false, best: null });
+  };
+  const paintAt = (e, erase) => {
+    const at = cellOf(e);
+    if (!at) return;
+    const [x, y] = at;
     const c = erase ? " " : tile, d = draftRef.current;
     if ((d.map[y][x] || " ") === c) return;
     let map = d.map.slice();
@@ -95,6 +126,8 @@ function Editor({ shown }) {
   const down = (e) => {
     if (pan) return;
     e.preventDefault();
+    remember();
+    if (tool === "fill") { const at = cellOf(e); if (at) fillAt(at[0], at[1], e.button === 2 ? " " : tile); return; }
     painting.current = e.button === 2 ? "erase" : "paint";
     try { cvRef.current.setPointerCapture(e.pointerId); } catch (err) {}
     paintAt(e, painting.current === "erase");
@@ -104,6 +137,7 @@ function Editor({ shown }) {
 
   const setSize = (dw, dh) => {
     const nW = Math.max(16, Math.min(160, W + dw)), nH = Math.max(10, Math.min(40, H + dh));
+    remember();
     setDraft({ ...draft, map: resize(draft.map, nW, nH), cleared: false, best: null });
   };
   const test = () => { const err = game.testDraft(draft); setMsg(err); };
@@ -113,11 +147,17 @@ function Editor({ shown }) {
     try { await navigator.clipboard.writeText(c); setMsg(draft.cleared ? "코드를 복사했다" : "코드를 복사했다 · 아직 완주 확인을 하지 않은 막이다"); }
     catch (err) { setMsg("아래 칸의 코드를 복사해 보내라"); }
   };
+  const link = async () => {
+    const url = game.shareLink(await game.draftCode(draft));
+    setCode(url);
+    try { await navigator.clipboard.writeText(url); setMsg("링크를 복사했다 · 열면 바로 이 막이 시작된다"); }
+    catch (err) { setMsg("아래 칸의 링크를 복사해 보내라"); }
+  };
   const load = async () => {
-    try { const d = await game.readCode(code); setDraft({ ...d, cleared: false, best: null }); setMsg(`불러왔다 · ${d.name || "이름 없는 막"}`); }
+    try { const d = await game.readCode(code.includes("#s=") ? code.split("#s=")[1] : code); remember(); setDraft({ ...d, cleared: false, best: null }); setMsg(`불러왔다 · ${d.name || "이름 없는 막"}`); }
     catch (err) { setMsg("읽을 수 없는 코드다"); }
   };
-  const fresh = () => { if (confirm("지금 그린 막을 지우고 새로 시작할까?")) { setDraft(blank()); setMsg(""); } };
+  const fresh = () => { if (confirm("지금 그린 막을 지우고 새로 시작할까?")) { remember(); setDraft(blank()); setMsg(""); } };
 
   return (
     <div className="overlay" id="editor" hidden={!shown}>
@@ -129,13 +169,15 @@ function Editor({ shown }) {
         </div>
         <div className="palette" id="edPalette">
           {TILES.map(([c, n, col]) => (
-            <button key={c} type="button" title={n} className={"tile" + (tile === c && !pan ? " sel" : "")} onClick={() => { setTile(c); setPan(false); }}>
+            <button key={c} type="button" title={n} className={"tile" + (tile === c && !pan ? " sel" : "")} onClick={() => { setTile(c); if (pan) setTool("paint"); }}>
               <i style={{ background: col }}>{c === " " ? "⌫" : c}</i><span>{n}</span>
             </button>
           ))}
-          <button type="button" className={"tile" + (pan ? " sel" : "")} title="화면 옮기기" onClick={() => setPan(!pan)}><i style={{ background: "#444" }}>✋</i><span>옮기기</span></button>
+          <button type="button" className={"tile" + (tool === "fill" ? " sel" : "")} id="edFill" title="같은 타일로 이어진 곳을 한 번에 칠한다" onClick={() => setTool(tool === "fill" ? "paint" : "fill")}><i style={{ background: "#5a8ad0" }}>▦</i><span>채우기</span></button>
+          <button type="button" className={"tile" + (pan ? " sel" : "")} title="화면 옮기기" onClick={() => setTool(pan ? "paint" : "pan")}><i style={{ background: "#444" }}>✋</i><span>옮기기</span></button>
+          <button type="button" className="tile" id="edUndo" title="되돌리기 (Ctrl+Z)" onClick={undo}><i style={{ background: "#444" }}>↶</i><span>되돌리기</span></button>
         </div>
-        <p className="edtip">{pan ? "옮기기 · 끌어서 화면을 움직인다" : `${NAME[tile]} · 누르거나 끌어서 칠한다 · 오른쪽 클릭은 지우개`}</p>
+        <p className="edtip">{pan ? "옮기기 · 끌어서 화면을 움직인다" : tool === "fill" ? `채우기 · ${NAME[tile]} · 누른 곳과 이어진 같은 타일을 모두 바꾼다` : `${NAME[tile]} · 누르거나 끌어서 칠한다 · 오른쪽 클릭은 지우개 · Ctrl+Z 되돌리기`}</p>
         <div className="edgrid" style={{ touchAction: pan ? "auto" : "none" }}>
           <canvas id="edCanvas" ref={cvRef} style={{ width: W * CELL, height: H * CELL }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onContextMenu={(e) => e.preventDefault()} />
         </div>
@@ -150,11 +192,12 @@ function Editor({ shown }) {
         <div className="row">
           <button className="primary" id="edTest" type="button" onClick={test}>시험하기</button>
           <button id="edShare" type="button" onClick={share}>코드 복사</button>
+          <button id="edLink" type="button" onClick={link}>링크 복사</button>
           <button id="edMenu" type="button" onClick={game.showMenu}>메뉴로</button>
         </div>
         {msg && <p className="edmsg" id="edMsg">{msg}</p>}
         <div className="row edcode">
-          <input id="edCode" placeholder="친구에게 받은 코드를 붙여 넣기" value={code} onChange={(e) => setCode(e.target.value)} />
+          <input id="edCode" placeholder="친구에게 받은 코드나 링크를 붙여 넣기" value={code} onChange={(e) => setCode(e.target.value)} />
           <button id="edLoad" type="button" onClick={load} disabled={!code.trim()}>불러오기</button>
         </div>
       </div>

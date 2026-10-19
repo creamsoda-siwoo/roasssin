@@ -62,6 +62,7 @@ function Menu({ info, shown, touch, muted, install }) {
           <summary>설정</summary>
           <div className="row">
             <button id="bSound" type="button" onClick={game.soundClick}>{muted ? "소리 끔" : "소리 켬"}</button>
+            <button id="bSpeed" type="button" title="느리게 하면 어려운 막을 익히기 쉽다 · 기록과 별은 100%에서만 남는다" onClick={game.cycleSpeed}>게임 속도 · {info.speed}%</button>
             <button id="bSkin" type="button" style={{ color: info.skin.color || undefined }} onClick={game.nextSkin}>{info.skin.label}</button>
             <Toggle id="bGhost" k="ghost" label="고스트" info={info} />
             <Toggle id="bBig" k="big" label="큰 버튼" info={info} touchOnly />

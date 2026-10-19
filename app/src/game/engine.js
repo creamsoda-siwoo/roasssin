@@ -39,7 +39,7 @@ const REBUILT = [43, 58, 66, 70, 92, 98, 107, 112, 113, 119, 121, 125, 126, 127,
 function loadSave() {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {}, bonusGhost: !!s.bonusGhost, boss: s.boss || {}, tower: s.tower || {} };
+    if (s && typeof s.unlocked === "number") return { unlocked: s.unlocked, best: s.best || {}, sr: s.sr || {}, bestH: s.bestH || {}, srH: s.srH || {}, hard: !!s.hard, diff: typeof s.diff === "number" ? s.diff : (s.hard ? 1 : 0), bestM: s.bestM || {}, srM: s.srM || {}, big: !!s.big, skin: s.skin || 0, left: !!s.left, fade: !!s.fade, vib: s.vib !== false, ghost: s.ghost !== false, daily: s.daily || null, streak: s.streak || 0, dailyLast: s.dailyLast || "", stats: s.stats || {}, ach: s.ach || {}, mapRev: s.mapRev || 1, story: s.story || {}, bonus: s.bonus || {}, bonusGhost: !!s.bonusGhost, boss: s.boss || {}, tower: s.tower || {}, speed: [1, 0.75, 0.5].includes(s.speed) ? s.speed : 1 };
   } catch (e) {}
   return { unlocked: 1, best: {}, sr: {}, bestH: {}, srH: {}, bestM: {}, srM: {}, hard: false, diff: 0, vib: true, ghost: true, stats: {}, ach: {}, mapRev: MAP_REV, story: {}, bonus: {}, boss: {}, tower: {}, bonusGhost: true };
 }
@@ -1739,7 +1739,7 @@ function startLevel(i, keepStats) {
   keepAwake(true);
   fadeGoal();
   update("hud", {
-    act: (i === CUSTOM_I ? "나만의 막 · 시험 플레이" : i === BONUS_I ? "보너스 · 초고난도" : i > BONUS_I ? `보스전 ${i - BONUS_I} / ${BOSSES.length}` : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : "") + (tower ? " · " + towerTag() : ""),
+    act: (i === CUSTOM_I ? (custom.shared ? "친구의 막" : "나만의 막 · 시험 플레이") : i === BONUS_I ? "보너스 · 초고난도" : i > BONUS_I ? `보스전 ${i - BONUS_I} / ${BOSSES.length}` : ACTS[i] + " / " + LEVELS.length) + (hard ? ` · ${DIFF_NAME[diff]} 모드` : "") + (daily ? ` · 오늘의 도전(${DAILY_MODS[daily.mod].name})` : "") + (tower ? " · " + towerTag() : "") + (gameSpeed() < 1 ? ` · 연습 속도 ${Math.round(save.speed * 100)}%` : ""),
     hard, master, name: lvAt(i).name, goal: lvAt(i).goal,
   });
   syncHintText();
@@ -1857,7 +1857,7 @@ function dailyCleared() {
     next: "메뉴로", retry: "다시 도전", menuBtn: false,
   });
 }
-export function winNext() { if (mode !== "win") return; if (cur === CUSTOM_I) { openEditor(); return; } if (tower) { towerPick(0); return; } if (daily) { showMenu(); return; } if (run) { run = null; showMenu(); } else nextLevel(); }
+export function winNext() { if (mode !== "win") return; if (cur === CUSTOM_I) { if (custom.shared) showMenu(); else openEditor(); return; } if (tower) { towerPick(0); return; } if (daily) { showMenu(); return; } if (run) { run = null; showMenu(); } else nextLevel(); }
 export function winRetry() { if (mode !== "win") return; if (tower) { towerPick(1); return; } if (run) startRun(run.a, run.b); else startLevel(cur, false); }
 function runStageCleared() {
   if (cur < run.b) {
@@ -1961,6 +1961,7 @@ function win() {
   if (daily) { dailyCleared(); return; }
   if (tower) { towerCleared(); return; }
   if (cur === CUSTOM_I) { customCleared(); return; }
+  if (gameSpeed() < 1) { practiceCleared(); return; }
   if (cur === BONUS_I) { bonusCleared(); return; }
   if (cur > BONUS_I) { bossCleared(cur - BONUS_I - 1); return; }
   const prev = bestTable()[cur];
@@ -2124,6 +2125,16 @@ export function testDraft(d) {
   return "";
 }
 function customCleared() {
+  if (custom.shared) {
+    bump("customClears"); writeSave();
+    showWin({
+      act: "친구의 막 · " + custom.name, title: "친구의 막 완주",
+      stars: null, starNote: "막 만들기에서 너만의 막을 그려 답장해라",
+      time: runTime.toFixed(1) + "초", deaths: runDeaths, best: runTime.toFixed(1) + "초",
+      next: "메뉴로", retry: "다시 하기", menuBtn: false,
+    });
+    return;
+  }
   const d = loadDraft();
   if (d && d.map.join("\n") === custom.map.join("\n")) { d.cleared = true; d.best = d.best && d.best < runTime ? d.best : runTime; saveDraft(d); }
   bump("customClears"); writeSave();
@@ -2153,6 +2164,32 @@ export async function readCode(code) {
   if (!Array.isArray(o.m) || !o.m.length || o.m.length > 60 || o.m.some((r) => typeof r !== "string" || r.length > 200)) throw new Error("shape");
   return { name: String(o.n || "").slice(0, 24), map: o.m };
 }
+// A shared stage link (…#s=<code>) opens straight into that stage, without touching the player's own draft.
+export async function playShared(code) {
+  const d = await readCode(code);
+  ensureAudio();
+  custom = { name: d.name || "친구의 막", goal: "친구가 그린 막 · 출구까지 가라", hint: "", needsPower: true, map: d.map, shared: true };
+  layerCache = null; run = null;
+  if (daily) { daily = null; applyDifficulty(); }
+  if (tower) { tower = null; applyDifficulty(); }
+  startLevel(CUSTOM_I, false);
+}
+export const shareLink = (code) => location.origin + location.pathname + "#s=" + code;
+// Practice speed slows the whole game for learning a hard stage. Clears still open the next stage but leave no records.
+// Speedruns, the daily challenge and the tower always run at full speed.
+const SPEEDS = [1, 0.75, 0.5];
+const gameSpeed = () => (daily || run || tower ? 1 : save.speed);
+export function cycleSpeed() { save.speed = SPEEDS[(SPEEDS.indexOf(save.speed) + 1) % SPEEDS.length]; writeSave(); }
+function practiceCleared() {
+  if (cur < LEVELS.length) { save.unlocked = Math.max(save.unlocked, Math.min(LEVELS.length, cur + 2)); writeSave(); }
+  showWin({
+    act: actAt(cur) + " · " + lvAt(cur).name + ` · 연습 속도 ${Math.round(save.speed * 100)}%`,
+    title: "연습 완료",
+    stars: null, starNote: "연습 속도에서는 기록과 별이 남지 않는다 · 설정에서 속도를 100%로 돌리고 다시 도전해라",
+    time: runTime.toFixed(1) + "초", deaths: runDeaths, best: "—",
+    next: cur < LEVELS.length && cur + 1 < LEVELS.length ? "다음 막" : "메뉴로", retry: "다시 하기", menuBtn: true,
+  });
+}
 export function playBoss(k) { ensureAudio(); run = null; startLevel(BOSS_I(k), false); }
 export function showMenu() {
   setMode("menu");
@@ -2180,6 +2217,7 @@ export function menuInfo() {
     srTitle: hard ? DIFF_NAME[diff] + " 스피드런" : "스피드런",
     starTotal: `모은 별 ★ ${have}` + (nextSkin ? ` · 다음 스카프(${nextSkin.name})까지 ${nextSkin.need - have}개` : " · 모든 스카프를 얻었다"),
     skin: { label: sk.name + " · " + sk.desc, color: sk.color === "rainbow" ? "" : sk.color },
+    speed: Math.round(save.speed * 100),
     settings: { big: !!save.big, left: !!save.left, fade: !!save.fade, vib: !!save.vib, ghost: !!save.ghost },
     levels: LEVELS.map((lv, i) => {
       const locked = i >= save.unlocked, best = bestTable()[i];
@@ -3198,7 +3236,7 @@ function frame(now) {
     }
   }
   if (L && (mode === "play" || mode === "dead")) {
-    acc += dt;
+    acc += dt * gameSpeed();
     while (acc >= STEP) { step(STEP); acc -= STEP; }
     updateCamera(dt);
     updateHUD();
@@ -3271,5 +3309,10 @@ export function attach(canvas) {
 
   setState({ touch: touchMode });
   showMenu();
+  const m = /[#&]s=([\w.-]+)/.exec(location.hash);
+  if (m) {
+    history.replaceState(null, "", location.pathname + location.search); // a reload goes back to the menu
+    playShared(m[1]).catch(() => toast("링크의 막을 읽을 수 없다", true));
+  }
   requestAnimationFrame(frame);
 }
