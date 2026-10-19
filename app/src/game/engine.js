@@ -342,7 +342,7 @@ function buildLevel(i) {
       else if (c === "{" || c === "}") st.gusty = true;
       else if (c === "p") st.hasPlates = true;
       else if (c === "0") {
-        st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: -1, kind: "hunter", boss: true, hp: def.bossHp || 3, maxHp: def.bossHp || 3, chase: false, lost: 0, search: 0, alive: true, wait: 0, seeT: 0, turnT: WATCH_T * 1.4, anim: 0, deadT: 0, alert: 0 });
+        st.guards.push({ x: x * TS + 6, y: y * TS + TS - 30, w: 20, h: 30, dir: -1, kind: "hunter", boss: true, target: true, hp: def.bossHp || 3, maxHp: def.bossHp || 3, chase: false, lost: 0, search: 0, alive: true, wait: 0, seeT: 0, turnT: WATCH_T * 1.4, anim: 0, deadT: 0, alert: 0 });
         c = " ";
       }
       else if (c >= "1" && c <= "9") { (st.bossPosts = st.bossPosts || {})[c] = { x, y }; c = " "; }
@@ -1617,7 +1617,7 @@ function startLevel(i, keepStats) {
   if (!keepStats && L.captive) setTimeout(() => toast("갇힌 사람을 구해 함께 출구로 가라"), 900);
   if (!keepStats && L.papers) setTimeout(() => toast("깊은 곳의 문서를 훔쳐라 · 손에 넣는 순간 불길이 번진다"), 900);
   if (!keepStats && (L.spare || L.hooksLeft != null || L.limit)) {
-    const tgs = L.guards.some((g) => g.target);
+    const tgs = L.spare && L.guards.some((g) => g.target);
     const rs = [tgs ? "표적만 처치 · 다른 자를 해치면 실패" : L.spare && "불살 · 경비를 해치면 실패", L.hooksLeft != null && `갈고리 ${L.hooksLeft}번`, L.limit && `제한 시간 ${L.limit}초`].filter(Boolean);
     setTimeout(() => toast("이 막의 규칙 · " + rs.join(" · ")), 900);
   }
@@ -2051,7 +2051,7 @@ function updateHUD() {
     chips.push([`열쇠 ${got}/${total}`, !doorsLeft]);
   }
   if (L.plates.length) chips.push([`발판 ${L.plates.filter((q) => q.pressed).length}/${L.plates.length}`, L.plateOpen]);
-  const tg = L.guards.filter((g) => g.target);
+  const tg = L.spare ? L.guards.filter((g) => g.target) : [];
   if (tg.length) { const dead = tg.filter((g) => !g.alive).length; chips.push([`표적 ${dead}/${tg.length} · 다른 자는 해치지 마라`, dead === tg.length]); }
   else if (L.spare) chips.push(["불살 · 아무도 해치지 마라", false]);
   if (L.captive) chips.push([L.captive.freed ? "동행 중 · 들키지 않게" : "갇힌 사람을 구해라", L.captive.freed]);
@@ -2388,7 +2388,7 @@ function drawPapers(t) {
 }
 function drawTargets(t) {
   for (const g of L.guards) {
-    if (!g.target || !g.alive) continue;
+    if (!g.target || !g.alive || g.boss) continue;
     const cx = g.x + g.w / 2, cy = g.y - 14 + Math.sin(t * 4 + g.x) * 2;
     ctx.fillStyle = "#e8c15a"; ctx.beginPath(); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx + 5, cy); ctx.lineTo(cx, cy + 6); ctx.lineTo(cx - 5, cy); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "#e8c15a"; ctx.fillRect(g.x + 2, g.y + 12, g.w - 4, 3);
