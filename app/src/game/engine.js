@@ -2,6 +2,7 @@
 // It owns the game loop; everything the UI shows is pushed to ./store.js and drawn by the React components.
 import { LEVELS, ACTS } from "./levels.js";
 import { BONUS } from "./bonus.js";
+import * as online from "./online.js";
 import { BOSSES } from "./bosses.js";
 import { getState, setState, update } from "./store.js";
 import { CHAPTERS, EPILOGUE, EPILOGUE2, chapterAt } from "./story.js";
@@ -53,6 +54,7 @@ const save = loadSave();
 // Ghost replays stay behind; they are large and rebuild themselves as you play.
 const CODE_PREFIX = "RA1.";
 function fnv(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619) >>> 0; return h.toString(36); }
+export const exportSave = () => JSON.parse(JSON.stringify(save));
 export function exportCode() {
   const bytes = new TextEncoder().encode(JSON.stringify(save));
   let bin = ""; for (const b of bytes) bin += String.fromCharCode(b);
@@ -67,6 +69,10 @@ export function importCode(text) {
   if (!body || fnv(body) !== sum) return "코드가 잘렸거나 틀렸다. 처음부터 끝까지 다시 복사해 보라.";
   let data;
   try { data = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(body), (c) => c.charCodeAt(0)))); } catch (e) { return "코드를 읽을 수 없다."; }
+  return importSave(data) || "";
+}
+// Replaces the save with another one (a pasted code or a cloud download) and restarts. Returns an error message, or "".
+export function importSave(data) {
   if (!data || typeof data.unlocked !== "number" || typeof data.best !== "object") return "진행 기록이 들어 있지 않은 코드다.";
   data.unlocked = Math.max(1, Math.min(LEVELS.length, Math.floor(data.unlocked)));
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { return "이 브라우저에는 저장할 수 없다."; }
@@ -1970,6 +1976,7 @@ function win() {
   const better = !prev || runTime < prev.time;
   const beforeStars = totalStars();
   if (better) { bestTable()[cur] = rec; storeGhost(cur, ghostRec); } else if (prev) prev.stars = rec.stars;
+  if (better && !run) postScore(`lv:${diff}:${cur}`, runTime, "초");
   save.unlocked = Math.max(save.unlocked, Math.min(LEVELS.length, cur + 2));
   writeSave();
   if (run) { runStageCleared(); return; }
@@ -1988,7 +1995,7 @@ function win() {
 // The bonus keeps one record per difficulty and never touches campaign progress or stars.
 function bonusCleared() {
   const prev = save.bonus[diff], better = !prev || runTime < prev.time;
-  if (better) { save.bonus[diff] = { time: runTime, deaths: runDeaths }; storeGhost(BONUS_I, ghostRec); }
+  if (better) { save.bonus[diff] = { time: runTime, deaths: runDeaths }; storeGhost(BONUS_I, ghostRec); postScore(`bonus:${diff}`, runTime, "초"); }
   writeSave();
   showWin({
     act: "보너스 · " + BONUS.name + (hard ? " · " + DIFF_NAME[diff] : ""),
@@ -2002,7 +2009,7 @@ function bonusCleared() {
 // Each boss keeps one record per difficulty and never touches campaign progress or stars.
 function bossCleared(k) {
   const key = diff + ":" + k, prev = save.boss[key], better = !prev || runTime < prev.time;
-  if (better) { save.boss[key] = { time: runTime, deaths: runDeaths }; storeGhost(BOSS_I(k), ghostRec); }
+  if (better) { save.boss[key] = { time: runTime, deaths: runDeaths }; storeGhost(BOSS_I(k), ghostRec); postScore(`boss:${diff}:${k}`, runTime, "초"); }
   writeSave();
   showWin({
     act: "보스전 · " + BOSSES[k].name + (hard ? " · " + DIFF_NAME[diff] : ""),
@@ -2060,6 +2067,7 @@ function towerCleared() {
   t.time += runTime;
   const better = t.floor > towerBest();
   if (better) save.tower[diff] = t.floor;
+  if (t.floor % 5 === 0 || better) online.submit(`tower:${diff}`, t.floor);
   bump("towerFloors"); writeSave();
   const pool = BLESSINGS.filter((x) => x.id !== "life" || t.lives < TOWER_MAX_LIVES);
   const a = pool.splice(rnd(pool.length), 1)[0], c = pool[rnd(pool.length)];
@@ -2084,6 +2092,7 @@ function towerPick(k) {
 function towerOver() {
   const t = tower, n = t.floor - 1;
   t.over = true; t.time += runTime;
+  if (n > 0) postScore(`tower:${diff}`, n, "층");
   setMode("win");
   sfx.die();
   writeSave();
@@ -2165,10 +2174,10 @@ export async function readCode(code) {
   return { name: String(o.n || "").slice(0, 24), map: o.m };
 }
 // A shared stage link (…#s=<code>) opens straight into that stage, without touching the player's own draft.
-export async function playShared(code) {
+export async function playShared(code, author) {
   const d = await readCode(code);
   ensureAudio();
-  custom = { name: d.name || "친구의 막", goal: "친구가 그린 막 · 출구까지 가라", hint: "", needsPower: true, map: d.map, shared: true };
+  custom = { name: d.name || "친구의 막", goal: author ? `${author}의 막 · 출구까지 가라` : "친구가 그린 막 · 출구까지 가라", hint: "", needsPower: true, map: d.map, shared: true };
   layerCache = null; run = null;
   if (daily) { daily = null; applyDifficulty(); }
   if (tower) { tower = null; applyDifficulty(); }
@@ -2190,6 +2199,20 @@ function practiceCleared() {
     next: cur < LEVELS.length && cur + 1 < LEVELS.length ? "다음 막" : "메뉴로", retry: "다시 하기", menuBtn: true,
   });
 }
+// A new personal best goes to the online board (when signed in), then the rank shows as a toast.
+function postScore(boardKey, value, unit) {
+  if (!online.account()) return;
+  online.submit(boardKey, value).then((ok) => ok && online.board(boardKey)).then((b) => {
+    if (b && b.me) setTimeout(() => toast(`온라인 순위 ${b.me.rank}위 / ${b.total}명 · ${unit === "층" ? b.me.value + "층" : b.me.value.toFixed(1) + "초"}`), 2200);
+  }).catch(() => {});
+}
+// While signed in, the save goes up to the cloud at most every two minutes, whenever the menu opens.
+let lastCloud = 0;
+function cloudAutoSave() {
+  if (!online.account() || Date.now() - lastCloud < 120000) return;
+  lastCloud = Date.now();
+  online.cloudPut(exportSave()).catch(() => { lastCloud = 0; });
+}
 export function playBoss(k) { ensureAudio(); run = null; startLevel(BOSS_I(k), false); }
 export function showMenu() {
   setMode("menu");
@@ -2199,6 +2222,7 @@ export function showMenu() {
   keepAwake(false);
   todaysDaily();
   checkAchievements();
+  cloudAutoSave();
   setState({ overlay: "menu", hudShown: false });
   writeSave();
 }
@@ -2217,7 +2241,7 @@ export function menuInfo() {
     srTitle: hard ? DIFF_NAME[diff] + " 스피드런" : "스피드런",
     starTotal: `모은 별 ★ ${have}` + (nextSkin ? ` · 다음 스카프(${nextSkin.name})까지 ${nextSkin.need - have}개` : " · 모든 스카프를 얻었다"),
     skin: { label: sk.name + " · " + sk.desc, color: sk.color === "rainbow" ? "" : sk.color },
-    speed: Math.round(save.speed * 100),
+    speed: Math.round(save.speed * 100), diff,
     settings: { big: !!save.big, left: !!save.left, fade: !!save.fade, vib: !!save.vib, ghost: !!save.ghost },
     levels: LEVELS.map((lv, i) => {
       const locked = i >= save.unlocked, best = bestTable()[i];

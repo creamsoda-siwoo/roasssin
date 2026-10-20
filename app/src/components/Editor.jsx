@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, memo } from "react";
 import * as game from "../game/engine.js";
+import * as online from "../game/online.js";
 
 // Tiles offered in the editor: [map char, name, colour]. The engine reads the same characters as the campaign maps.
 const TILES = [
@@ -147,6 +148,14 @@ function Editor({ shown }) {
     try { await navigator.clipboard.writeText(c); setMsg(draft.cleared ? "코드를 복사했다" : "코드를 복사했다 · 아직 완주 확인을 하지 않은 막이다"); }
     catch (err) { setMsg("아래 칸의 코드를 복사해 보내라"); }
   };
+  // only stages proven clearable go to the gallery
+  const publish = async () => {
+    if (!online.account()) { setMsg("메뉴의 '온라인'에서 이름을 정한 뒤 올릴 수 있다"); return; }
+    if (!draft.cleared) { setMsg("먼저 시험하기로 끝까지 깨서 완주 확인을 받아라"); return; }
+    if (!draft.name.trim()) { setMsg("막 이름을 정해라"); return; }
+    try { await online.upload(draft.name.trim(), await game.draftCode(draft)); setMsg("갤러리에 올렸다 · 메뉴의 온라인 → 막 갤러리에서 볼 수 있다"); }
+    catch (err) { setMsg("올리지 못했다 · " + (err.message || "서버 오류")); }
+  };
   const link = async () => {
     const url = game.shareLink(await game.draftCode(draft));
     setCode(url);
@@ -193,6 +202,7 @@ function Editor({ shown }) {
           <button className="primary" id="edTest" type="button" onClick={test}>시험하기</button>
           <button id="edShare" type="button" onClick={share}>코드 복사</button>
           <button id="edLink" type="button" onClick={link}>링크 복사</button>
+          <button id="edPublish" type="button" onClick={publish}>갤러리에 올리기</button>
           <button id="edMenu" type="button" onClick={game.showMenu}>메뉴로</button>
         </div>
         {msg && <p className="edmsg" id="edMsg">{msg}</p>}

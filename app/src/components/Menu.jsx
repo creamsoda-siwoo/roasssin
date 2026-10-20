@@ -1,6 +1,7 @@
 import { useEffect, useState, memo } from "react";
 import * as game from "../game/engine.js";
 import { LEVELS } from "../game/levels.js";
+import Online from "./Online.jsx";
 
 const onOff = (on) => (on ? " 켬" : " 끔");
 
@@ -165,6 +166,7 @@ function Menu({ info, shown, touch, muted, install }) {
           </dl>
         </details>
         <GimmickBook levels={info.levels} />
+        <Online info={info} />
         <SaveTransfer />
         <details className="fold">
           <summary>조작법</summary>
